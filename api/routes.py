@@ -15,6 +15,7 @@ main_bp = Blueprint('main', __name__)
 def get_turtle_data():
     """
     DB에서 활성 포지션 데이터를 가져와서 시스템별로 분류하여 반환
+    DB 연결 실패시 빈 데이터 반환
     """
     try:
         position_dao = PositionDAO()
@@ -45,6 +46,8 @@ def get_turtle_data():
             else:
                 system2.append(stock_data)
         
+        logger.info(f"DB에서 포지션 조회 성공: System1={len(system1)}, System2={len(system2)}")
+        
         # 마지막 업데이트 시각
         last_updated = datetime.now()
         
@@ -56,6 +59,7 @@ def get_turtle_data():
         
     except Exception as e:
         logger.error(f"포지션 데이터 조회 실패: {e}")
+        logger.warning("DB 연결 문제로 빈 데이터를 반환합니다.")
         return {
             'system1': [],
             'system2': [],
@@ -85,6 +89,22 @@ def api_turtle_data():
         'last_updated': data['last_updated'].isoformat()
     })
 
+
+@api_bp.route('/health')
+def health():
+    """헬스 체크 API"""
+    try:
+        # DB 연결 테스트
+        position_dao = PositionDAO()
+        db_status = "connected"
+    except Exception as e:
+        db_status = f"disconnected: {str(e)}"
+    
+    return jsonify({
+        'status': 'ok',
+        'database': db_status,
+        'timestamp': datetime.now().isoformat()
+    })
 
 @api_bp.route('/refresh')
 def refresh():
