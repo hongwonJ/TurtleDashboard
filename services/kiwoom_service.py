@@ -22,6 +22,13 @@ class KiwoomAPIService:
         self.access_token: Optional[str] = None
         self.token_expires_at: Optional[datetime] = None
 
+        # 선발급: 인스턴스 초기화 시 토큰 발급
+        try:
+            self.get_access_token(force_refresh=True)
+            logger.info(f"Access token pre-fetched at init, expires at {self.token_expires_at}.")
+        except Exception as e:
+            logger.error(f"초기 토큰 발급 실패: {e}")
+
     def get_access_token(self, force_refresh: bool = False) -> str:
         token_url = f"{self.base_url}/oauth2/token"
         if force_refresh or not self.access_token or datetime.now() >= (self.token_expires_at or datetime.min):
@@ -231,3 +238,87 @@ class KiwoomAPIService:
         except Exception as e:
             logger.error(f"request_condition 오류: {e}")
             return all_results
+        
+
+    def get_daily_candles(self,
+                          stk_cd: str,
+                          count: int = 60,
+                          upd_stkpc_tp: str = "1",
+                          base_dt: Optional[str] = None) -> pd.DataFrame:
+        """
+        Fetches up to `count` days of daily candle data for a given stock code.
+        Uses REST API TR `stk_dt_pole_chart_qry` with paging (cont-yn / next-key).
+
+        :param stk_cd: 종목코드 (e.g. '039490')
+        :param count: 최대 조회일수
+        :param upd_stkpc_tp: 수정주가구분 (0: 원본, 1: 수정)
+        :param base_dt: 기준일자 (YYYYMMDD), default: today
+        :return: pandas.DataFrame with columns [date, open, high, low, close, volume]
+        """
+        # Endpoint path for daily candle TR; adjust if needed
+        endpoint_path = getattr(Config, 'KIWOOM_DAILY_CANDLE_PATH', '/daily-candle')
+        url = f"{self.base_url}{endpoint_path}"
+
+        headers = {
+            'Content-Type': 'application/json;charset=UTF-8',
+            'api-id': 'stk_dt_pole_chart_qry',
+            'appkey': self.app_key,
+            'secretkey': self.app_secret
+        }
+        # Include auth token
+        token = self.get_access_token()
+        if token:
+            headers['Authorization'] = f"Bearer {token}"
+
+        cont_yn = None
+        next_key = None
+        all_data: List[Dict[str, Any]] = []
+
+        # Default base_dt to today if not provided
+        if not base_dt:
+            base_dt = datetime.now().strftime('%Y%m%d')
+
+        while True:
+            # Set paging headers if available
+            if cont_yn:
+                headers['cont-yn'] = cont_yn
+                headers['next-key'] = next_key or ''
+
+            body = {
+                'stk_cd': stk_cd,
+                'base_dt': base_dt,
+                'upd_stkpc_tp': upd_stkpc_tp
+            }
+
+            resp = requests.post(url, headers=headers, json=body, timeout=30)
+            resp.raise_for_status()
+
+            # Parse paging info
+            cont_yn = resp.headers.get('cont-yn')
+            next_key = resp.headers.get('next-key')
+
+            # Parse body data
+            data = resp.json().get('stk_dt_pole_chart_qry', [])
+            all_data.extend(data)
+
+            # Stop if no more pages or enough data
+            if cont_yn != 'Y' or len(all_data) >= count:
+                break
+
+        # Trim to requested count
+        sliced = all_data[:count]
+        df = pd.DataFrame(sliced)
+        if df.empty:
+            return df
+
+        # Rename and convert columns
+        df = df.rename(columns={
+            'dt': 'date',
+            'open_pric': 'open',
+            'high_pric': 'high',
+            'low_pric': 'low',
+            'cur_prc': 'close',
+            'trde_qty': 'volume'
+        })
+        df['date'] = pd.to_datetime(df['date'], format='%Y%m%d')
+        return df
