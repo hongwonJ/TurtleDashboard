@@ -17,11 +17,13 @@ def create_app():
     app.register_blueprint(api_bp, url_prefix='/api')
     return app
 
-if __name__ == '__main__':
-    # 스케줄러 헬퍼 함수로 스레드 시작
-    start_scheduler_thread()
-    logger.info('Turtle Scheduler thread started')
+# gunicorn이 찾을 수 있도록 모듈 레벨에 app 노출
+app = create_app()
 
-    app = create_app()
-    logger.info('Starting Flask application')
+# 스케줄러는 앱 생성 후 시작
+start_scheduler_thread()
+logger.info('Turtle Scheduler thread started')
+
+if __name__ == '__main__':
+    logger.info('Starting Flask application in development mode')
     app.run(debug=True, host='0.0.0.0', port=8000)
