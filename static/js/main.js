@@ -8,6 +8,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 30초마다 자동 새로고침
   setInterval(handleRefresh, 30000);
+
+  // 마지막 업데이트 시간 표시
+  const status = document.querySelector('.status');
+  if (status) {
+    console.log('상태 정보:', status.textContent);
+  }
 });
 
 async function handleRefresh() {
@@ -79,3 +85,21 @@ function updateTimestamp() {
   el.textContent = `마지막 업데이트: ${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ` +
                    `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
 }
+
+// 수동 업데이트 함수
+function manualUpdate() {
+    fetch('/api/manual-update', {method: 'POST'})
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message);
+            window.location.reload();
+        })
+        .catch(error => {
+            alert('업데이트 실패: ' + error);
+        });
+}
+
+// 5분마다 자동 새로고침
+setInterval(() => {
+    window.location.reload();
+}, 5 * 60 * 1000);

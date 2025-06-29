@@ -3,117 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Turtle Signal Dashboard</title>
+    <title>🐢 터틀 대시보드</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
-        <div class="header" aria-live="polite">
-            <h1>🐢 Turtle Signal Dashboard</h1>
+        <h1>🐢 터틀 트레이딩 대시보드</h1>
+        
+        <div class="status">
+            <strong>상태:</strong> {{ status }}
             {% if last_updated %}
-            <div class="last-updated">
-                마지막 업데이트: {{ last_updated.strftime('%Y-%m-%d %H:%M:%S') }}
-            </div>
+            | <strong>마지막 업데이트:</strong> {{ last_updated.strftime('%Y-%m-%d %H:%M:%S') }}
+            {% endif %}
+            <br>
+            <button class="refresh-btn" onclick="window.location.reload()">새로고침</button>
+            <button class="refresh-btn" onclick="manualUpdate()">수동 업데이트</button>
+        </div>
+        
+        <div class="api-links">
+            <a href="/api/turtle-data">API 데이터</a> |
+            <a href="/api/health">헬스 체크</a> |
+            <a href="/api/manual-update">수동 업데이트</a>
+        </div>
+        
+        <!-- System 1 -->
+        <div class="system">
+            <h2>터틀 System 1 (단기) - {{ system1|length }}개 종목</h2>
+            {% if system1 %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>종목명</th><th>종목코드</th><th>진입일</th><th>진입가</th>
+                        <th>현재가</th><th>손절가</th><th>트레일링</th><th>추가매수</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for stock in system1 %}
+                    <tr>
+                        <td class="stock-name">{{ stock.name }}</td>
+                        <td class="stock-code">{{ stock.code }}</td>
+                        <td>{{ stock.entry_date }}</td>
+                        <td class="price entry-price">{{ "{:,}".format(stock.entry_price|int) }}</td>
+                        <td class="price">{{ "{:,}".format(stock.current|int) }}</td>
+                        <td class="price stop-loss">{{ "{:,}".format(stock.stop_loss|int) }}</td>
+                        <td class="price trailing-stop">{{ "{:,}".format(stock.trailing_stop|int) }}</td>
+                        <td class="price add-position">{{ "{:,}".format(stock.add_position|int) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
             {% else %}
-            <div class="last-updated">
-                데이터를 불러오는 중...
-            </div>
+            <div class="no-data">아직 신호가 없습니다.</div>
             {% endif %}
         </div>
         
-        <div class="systems-container">
-                            <!-- System 1 -->
-            <div class="system-section system1">
-                <div class="system-header">
-                    터틀 System 1 (단기)
-                    <div class="stock-count">{{ system1_stocks|length }}개 종목</div>
-                </div>
-                
-                {% if system1_stocks %}
-                <div class="table-responsive">
-                    <table class="stock-table">
-                        <thead>
-                            <tr>
-                                <th scope="col">종목코드</th>
-                                <th scope="col">종목명</th>
-                                <th scope="col">진입일</th>
-                                <th scope="col">진입가</th>
-                                <th scope="col">현재가</th>
-                                <th scope="col">손절가</th>
-                                <th scope="col">트레일링</th>
-                                <th scope="col">추가매수</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for stock in system1_stocks %}
-                            <tr>
-                                <td class="stock-code">{{ stock.code }}</td>
-                                <td class="stock-name">{{ stock.name }}</td>
-                                <td class="date">{{ stock.entry_date or '-' }}</td>
-                                <td class="price entry-price">{{ stock.entry_price ? "{:,}".format(stock.entry_price|int) : '-' }}</td>
-                                <td class="price">{{ stock.current ? "{:,}".format(stock.current|int) : '-' }}</td>
-                                <td class="price stop-loss">{{ stock.stop_loss ? "{:,}".format(stock.stop_loss|int) : '-' }}</td>
-                                <td class="price trailing-stop">{{ stock.trailing_stop ? "{:,}".format(stock.trailing_stop|int) : '-' }}</td>
-                                <td class="price add-position">{{ stock.add_position ? "{:,}".format(stock.add_position|int) : '-' }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% else %}
-                <div class="no-data">System 1 신호가 감지된 종목이 없습니다.</div>
-                {% endif %}
-            </div>
-            
-            <!-- System 2 -->
-            <div class="system-section system2">
-                <div class="system-header">
-                    터틀 System 2 (장기)
-                    <div class="stock-count">{{ system2_stocks|length }}개 종목</div>
-                </div>
-                
-                {% if system2_stocks %}
-                <div class="table-responsive">
-                    <table class="stock-table">
-                        <thead>
-                            <tr>
-                                <th scope="col">종목코드</th>
-                                <th scope="col">종목명</th>
-                                <th scope="col">진입일</th>
-                                <th scope="col">진입가</th>
-                                <th scope="col">현재가</th>
-                                <th scope="col">손절가</th>
-                                <th scope="col">트레일링</th>
-                                <th scope="col">추가매수</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for stock in system2_stocks %}
-                            <tr>
-                                <td class="stock-code">{{ stock.code }}</td>
-                                <td class="stock-name">{{ stock.name }}</td>
-                                <td class="date">{{ stock.entry_date or '-' }}</td>
-                                <td class="price entry-price">{{ stock.entry_price ? "{:,}".format(stock.entry_price|int) : '-' }}</td>
-                                <td class="price">{{ stock.current ? "{:,}".format(stock.current|int) : '-' }}</td>
-                                <td class="price stop-loss">{{ stock.stop_loss ? "{:,}".format(stock.stop_loss|int) : '-' }}</td>
-                                <td class="price trailing-stop">{{ stock.trailing_stop ? "{:,}".format(stock.trailing_stop|int) : '-' }}</td>
-                                <td class="price add-position">{{ stock.add_position ? "{:,}".format(stock.add_position|int) : '-' }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% else %}
-                <div class="no-data">System 2 신호가 감지된 종목이 없습니다.</div>
-                {% endif %}
-            </div>
+        <!-- System 2 -->
+        <div class="system">
+            <h2>터틀 System 2 (장기) - {{ system2|length }}개 종목</h2>
+            {% if system2 %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>종목명</th><th>종목코드</th><th>진입일</th><th>진입가</th>
+                        <th>현재가</th><th>손절가</th><th>트레일링</th><th>추가매수</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for stock in system2 %}
+                    <tr>
+                        <td class="stock-name">{{ stock.name }}</td>
+                        <td class="stock-code">{{ stock.code }}</td>
+                        <td>{{ stock.entry_date }}</td>
+                        <td class="price entry-price">{{ "{:,}".format(stock.entry_price|int) }}</td>
+                        <td class="price">{{ "{:,}".format(stock.current|int) }}</td>
+                        <td class="price stop-loss">{{ "{:,}".format(stock.stop_loss|int) }}</td>
+                        <td class="price trailing-stop">{{ "{:,}".format(stock.trailing_stop|int) }}</td>
+                        <td class="price add-position">{{ "{:,}".format(stock.add_position|int) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="no-data">아직 신호가 없습니다.</div>
+            {% endif %}
         </div>
     </div>
     
-    <!-- 새로고침 버튼 -->
-    <button class="refresh-btn" aria-label="새로고침">🔄 새로고침</button>
-    
-    <!-- 메인 JS -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

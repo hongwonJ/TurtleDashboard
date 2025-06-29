@@ -6,134 +6,167 @@
 }
 
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #f5f5f5;
+  font-family: Arial, sans-serif;
+  margin: 20px;
+  background: #f5f5f5;
   color: #333;
 }
 
 .container {
   max-width: 1200px;
-  margin: 20px auto;
-  padding: 0 15px;
+  margin: 0 auto;
 }
 
-.header {
-  text-align: center;
-  margin-bottom: 20px;
-}
-
-.header h1 {
-  font-size: 1.8rem;
+h1 {
   color: #2c3e50;
+  text-align: center;
 }
 
-.last-updated {
-  margin-top: 5px;
-  font-size: 0.9rem;
-  color: #7f8c8d;
+h2 {
+  margin-top: 0;
 }
 
-.systems-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 20px;
+/* 상태 표시 */
+.status {
+  text-align: center;
+  margin: 20px 0;
+  padding: 10px;
+  background: #ecf0f1;
+  border-radius: 5px;
 }
 
-.system-section {
-  background: #fff;
+/* 시스템 박스 */
+.system {
+  margin: 20px 0;
+  padding: 15px;
+  background: white;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.system-header {
-  padding: 12px 16px;
-  color: #fff;
-  font-weight: bold;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.system h2 {
+  margin-top: 0;
 }
 
-.system1 .system-header {
-  background: linear-gradient(45deg, #3498db, #2980b9);
+/* System 1과 2 색상 구분 */
+.system:nth-child(4) h2 { /* System 1 */
+  color: #3498db;
 }
 
-.system2 .system-header {
-  background: linear-gradient(45deg, #e74c3c, #c0392b);
+.system:nth-child(5) h2 { /* System 2 */
+  color: #e74c3c;
 }
 
-.stock-count {
-  font-size: 0.85rem;
-  opacity: 0.8;
-}
-
-.table-responsive {
-  overflow-x: auto;
-}
-
-.stock-table {
+/* 테이블 스타일 */
+table {
   width: 100%;
   border-collapse: collapse;
+  margin-top: 10px;
 }
 
-.stock-table th,
-.stock-table td {
-  padding: 6px 8px;
+th, td {
+  padding: 8px;
   text-align: left;
-  font-size: 0.85rem;
-  border-bottom: 1px solid #ecf0f1;
+  border-bottom: 1px solid #ddd;
 }
 
-.stock-table th {
-  background: #ecf0f1;
-  font-weight: 600;
-}
-
-.stock-table tbody tr:hover {
+th {
   background: #f8f9fa;
+  font-weight: bold;
 }
 
-.stock-code { color: #2c3e50; font-weight: 600; }
-.stock-name { color: #34495e; }
-.price { text-align: right; font-weight: 600; }
-.positive { color: #e74c3c; }
-.negative { color: #3498db; }
-.neutral { color: #7f8c8d; }
-.volume { text-align: right; font-size: 0.85rem; }
-.stop-loss { color: #e74c3c; font-weight: 700; }
-.trailing-stop { color: #9b59b6; font-weight: 700; }
-.add-position { color: #f39c12; font-weight: 600; }
-.entry-price { color: #6f42c1; font-weight: 600; text-align: right; }
-.date { color: #6c757d; font-size: 0.8rem; font-weight: 500; text-align: center; }
+/* 가격 관련 스타일 */
+.price {
+  text-align: right;
+  font-family: monospace;
+}
 
+.stop-loss {
+  color: #e74c3c;
+  font-weight: bold;
+}
+
+.trailing-stop {
+  color: #9b59b6;
+  font-weight: bold;
+}
+
+.add-position {
+  color: #f39c12;
+  font-weight: bold;
+}
+
+.entry-price {
+  color: #6f42c1;
+  font-weight: bold;
+}
+
+/* 종목 정보 */
+.stock-name {
+  color: #2c3e50;
+  font-weight: bold;
+  font-size: 0.95em;
+}
+
+.stock-code {
+  color: #7f8c8d;
+  font-size: 0.85em;
+  font-family: monospace;
+}
+
+/* 데이터 없음 표시 */
 .no-data {
-  padding: 30px;
   text-align: center;
   color: #7f8c8d;
-  font-style: italic;
+  padding: 30px;
 }
 
+/* 버튼 스타일 */
 .refresh-btn {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
   background: #3498db;
-  color: #fff;
+  color: white;
   border: none;
-  padding: 12px 18px;
-  border-radius: 50px;
+  padding: 10px 20px;
+  border-radius: 5px;
   cursor: pointer;
-  font-size: 0.9rem;
-  box-shadow: 0 4px 12px rgba(52,152,219,0.3);
-  transition: transform 0.2s;
+  margin: 10px 5px;
 }
 
 .refresh-btn:hover {
-  transform: translateY(-2px);
+  background: #2980b9;
 }
 
-@media (max-width: 600px) {
-  .header h1 { font-size: 1.4rem; }
-  .stock-table th, .stock-table td { padding: 6px 8px; font-size: 0.8rem; }
+/* API 링크 */
+.api-links {
+  text-align: center;
+  margin: 20px 0;
+}
+
+.api-links a {
+  margin: 0 10px;
+  color: #3498db;
+  text-decoration: none;
+}
+
+.api-links a:hover {
+  text-decoration: underline;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  body {
+    margin: 10px;
+  }
+  
+  .container {
+    max-width: 100%;
+  }
+  
+  table {
+    font-size: 0.9em;
+  }
+  
+  th, td {
+    padding: 6px;
+  }
 }
