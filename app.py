@@ -21,6 +21,7 @@ def create_app():
         <ul>
             <li><a href="/api/health">헬스 체크</a></li>
             <li><a href="/api/test">환경변수 테스트</a></li>
+            <li><a href="/api/test-db">DB 연결 테스트</a></li>
         </ul>
         '''
     
@@ -50,6 +51,36 @@ def create_app():
         except Exception as e:
             logger.error(f"테스트 실패: {e}")
             return jsonify({'status': 'error', 'message': str(e)})
+    
+    @app.route('/api/test-db')
+    def test_db():
+        logger.info("DB 연결 테스트 요청")
+        try:
+            # DB 연결 테스트
+            from database.connection import DatabaseConnection
+            db_conn = DatabaseConnection()
+            conn = db_conn.get_connection()
+            
+            # 간단한 쿼리 실행
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1 as test")
+            result = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            
+            logger.info("DB 연결 성공!")
+            return jsonify({
+                'status': 'success',
+                'message': 'DB 연결 성공',
+                'test_query_result': result[0] if result else None
+            })
+            
+        except Exception as e:
+            logger.error(f"DB 연결 실패: {e}")
+            return jsonify({
+                'status': 'error', 
+                'message': f'DB 연결 실패: {str(e)}'
+            })
     
     logger.info("Flask 앱 설정 완료")
     return app
