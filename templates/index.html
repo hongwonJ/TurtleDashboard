@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}메인 페이지{% endblock %}
+{% block content %}
+<h1>환영합니다! Turtle Dashboard</h1>
+
+{% if stocks_new %}
+<h2>신규 추가 Turtle 종목</h2>
+<table class="stock-table">
+  <thead><tr><th>티커</th><th>종목명</th><th>신호</th></tr></thead>
+  <tbody>
+    {% for s in stocks_new %}
+    <tr><td>{{ s.ticker }}</td><td>{{ s.name }}</td><td>{{ s.signal }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<h2>전체 Turtle 종목</h2>
+<table class="stock-table">
+  <thead><tr><th>티커</th><th>종목명</th></tr></thead>
+  <tbody>
+    {% for s in stocks_all %}
+    <tr><td>{{ s.ticker }}</td><td>{{ s.name }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

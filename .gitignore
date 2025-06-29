@@ -1,0 +1,7 @@
+# Git 무시 파일 목록
+.env
+__pycache__/
+*.pyc
+instance/
+.webassets-cache
+tests/
