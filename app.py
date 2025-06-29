@@ -21,4 +21,4 @@ if __name__ == '__main__':
     logger.info("터틀 대시보드 웹 애플리케이션 시작")
     
     # Flask 애플리케이션 실행
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=8000)
