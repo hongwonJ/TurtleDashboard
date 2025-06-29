@@ -1,2 +1,80 @@
-// 메인 JS 파일
-console.log('Turtle Dashboard loaded');
+// static/js/main.js
+
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('Turtle Dashboard loaded');
+
+  const refreshBtn = document.querySelector('.refresh-btn');
+  refreshBtn.addEventListener('click', handleRefresh);
+
+  // 30초마다 자동 새로고침
+  setInterval(handleRefresh, 30000);
+});
+
+async function handleRefresh() {
+  const btn = document.querySelector('.refresh-btn');
+  btn.textContent = '새로고침 중…';
+  btn.disabled = true;
+
+  try {
+    const refreshRes = await fetch('/api/refresh');
+    const refreshData = await refreshRes.json();
+
+    if (refreshData.status !== 'success') {
+      alert('새로고침 실패: ' + refreshData.message);
+      return;
+    }
+
+    // API로부터 최신 데이터 가져와 테이블만 갱신
+    await updateTables();
+    updateTimestamp();
+
+  } catch (err) {
+    console.error(err);
+    alert('오류가 발생했습니다: ' + err.message);
+  } finally {
+    btn.textContent = '🔄 새로고침';
+    btn.disabled = false;
+  }
+}
+
+async function updateTables() {
+  const res = await fetch('/api/turtle-data');
+  const { system1, system2 } = await res.json();
+
+  const render = (selector, stocks) => {
+    const tbody = document.querySelector(`${selector} tbody`);
+    const noData = document.querySelector(`${selector} .no-data`);
+
+    tbody.innerHTML = '';
+    if (!stocks || stocks.length === 0) {
+      noData.style.display = 'block';
+      return;
+    }
+    noData.style.display = 'none';
+
+    stocks.forEach(stock => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="stock-code">${stock.code}</td>
+        <td class="stock-name">${stock.name}</td>
+        <td class="price">${stock.current != null ? stock.current.toLocaleString() : '-'}</td>
+        <td class="price ${stock.rate > 0 ? 'positive' : stock.rate < 0 ? 'negative' : 'neutral'}">
+          ${stock.rate != null ? stock.rate + '%' : '-'}
+        </td>
+        <td class="volume">${stock.volume != null ? stock.volume.toLocaleString() : '-'}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  };
+
+  render('.system1 .stock-table', system1);
+  render('.system2 .stock-table', system2);
+}
+
+function updateTimestamp() {
+  const el = document.querySelector('.last-updated');
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  el.textContent = `마지막 업데이트: ${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ` +
+                   `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+}
