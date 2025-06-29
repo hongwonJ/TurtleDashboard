@@ -1,37 +1,24 @@
-from flask import Flask, render_template
-from flask_caching import Cache
-from apscheduler.schedulers.background import BackgroundScheduler
-from datetime import datetime
-from services.kiwoom_service import KiwoomAPIService
+# app.py
+
+from flask import Flask
+import logging
+from scheduler import start_scheduler_thread
+from api.routes import api_bp, main_bp
+
+# 로깅 설정
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.config['CACHE_TYPE'] = 'simple'
-cache = Cache(app)
-cache.init_app(app)
-cache.set('turtle_list', [])
-cache.set('new_turtle_list', [])
-service = KiwoomAPIService()
 
-def fetch_and_update_turtle_list():
-    today = datetime.now().strftime('%Y-%m-%d')
-    today_list = service.get_daily_turtle_list()
-    existing = cache.get('turtle_list') or []
-    new_items = [t for t in today_list if t not in existing]
-    cache.set('new_turtle_list', new_items)
-    cache.set('turtle_list', today_list)
-    print(f"[{today} 16:00] New Turtle: {new_items}")
-
-scheduler = BackgroundScheduler(timezone='Asia/Seoul')
-scheduler.add_job(fetch_and_update_turtle_list, 'cron', hour=16, minute=0, id='turtle_fetch')
-scheduler.start()
-
-@app.route('/')
-def index():
-    all_turtles = cache.get('turtle_list') or []
-    new_turtles = cache.get('new_turtle_list') or []
-    stocks_all = [{'ticker': t, 'name': '', 'signal': ''} for t in all_turtles]
-    stocks_new = [{'ticker': t, 'name': '', 'signal': '신규 추가'} for t in new_turtles]
-    return render_template('index.html', stocks_all=stocks_all, stocks_new=stocks_new)
+# Blueprint 등록
+app.register_blueprint(main_bp)
+app.register_blueprint(api_bp, url_prefix='/api')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # 스케줄러 시작
+    start_scheduler_thread()
+    logger.info("터틀 대시보드 웹 애플리케이션 시작")
+    
+    # Flask 애플리케이션 실행
+    app.run(debug=True, host='0.0.0.0', port=5000)

@@ -1,27 +1,342 @@
-{% extends 'base.html' %}
-{% block title %}메인 페이지{% endblock %}
-{% block content %}
-<h1>환영합니다! Turtle Dashboard</h1>
-
-{% if stocks_new %}
-<h2>신규 추가 Turtle 종목</h2>
-<table class="stock-table">
-  <thead><tr><th>티커</th><th>종목명</th><th>신호</th></tr></thead>
-  <tbody>
-    {% for s in stocks_new %}
-    <tr><td>{{ s.ticker }}</td><td>{{ s.name }}</td><td>{{ s.signal }}</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
-{% endif %}
-
-<h2>전체 Turtle 종목</h2>
-<table class="stock-table">
-  <thead><tr><th>티커</th><th>종목명</th></tr></thead>
-  <tbody>
-    {% for s in stocks_all %}
-    <tr><td>{{ s.ticker }}</td><td>{{ s.name }}</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
-{% endblock %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Turtle Signal Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .last-updated {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+        
+        .systems-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        
+        .system-section {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .system-header {
+            padding: 20px;
+            font-weight: bold;
+            font-size: 18px;
+            color: white;
+        }
+        
+        .system1 .system-header {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+        }
+        
+        .system2 .system-header {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+        }
+        
+        .stock-count {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+        
+        .stock-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .stock-table th {
+            background-color: #ecf0f1;
+            padding: 12px 8px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 14px;
+            border-bottom: 2px solid #bdc3c7;
+        }
+        
+        .stock-table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #ecf0f1;
+            font-size: 13px;
+        }
+        
+        .stock-table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .stock-code {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .stock-name {
+            color: #34495e;
+        }
+        
+        .price {
+            text-align: right;
+            font-weight: 600;
+        }
+        
+        .positive {
+            color: #e74c3c;
+        }
+        
+        .negative {
+            color: #3498db;
+        }
+        
+        .neutral {
+            color: #7f8c8d;
+        }
+        
+        .volume {
+            text-align: right;
+            color: #7f8c8d;
+        }
+        
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+            font-style: italic;
+        }
+        
+        .refresh-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .refresh-btn:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+        }
+        
+        @media (max-width: 768px) {
+            .systems-container {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .container {
+                padding: 10px;
+            }
+            
+            .stock-table th,
+            .stock-table td {
+                padding: 8px 4px;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🐢 Turtle Signal Dashboard</h1>
+            {% if last_updated %}
+            <div class="last-updated">
+                마지막 업데이트: {{ last_updated.strftime('%Y-%m-%d %H:%M:%S') }}
+            </div>
+            {% else %}
+            <div class="last-updated">
+                데이터를 불러오는 중...
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="systems-container">
+            <!-- System 1 -->
+            <div class="system-section system1">
+                <div class="system-header">
+                    터틀 System 1 (단기)
+                    <div class="stock-count">{{ system1_stocks|length }}개 종목</div>
+                </div>
+                
+                {% if system1_stocks %}
+                <table class="stock-table">
+                    <thead>
+                        <tr>
+                            <th>종목코드</th>
+                            <th>종목명</th>
+                            <th>현재가</th>
+                            <th>등락률</th>
+                            <th>거래량</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stock in system1_stocks %}
+                        <tr>
+                            <td class="stock-code">{{ stock.code }}</td>
+                            <td class="stock-name">{{ stock.name }}</td>
+                            <td class="price">
+                                {% if stock.current %}
+                                    {{ "{:,}".format(stock.current|int) }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td class="price {% if stock.rate and stock.rate|float > 0 %}positive{% elif stock.rate and stock.rate|float < 0 %}negative{% else %}neutral{% endif %}">
+                                {% if stock.rate %}
+                                    {{ stock.rate }}%
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td class="volume">
+                                {% if stock.volume %}
+                                    {{ "{:,}".format(stock.volume|int) }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="no-data">
+                    System 1 신호가 감지된 종목이 없습니다.
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- System 2 -->
+            <div class="system-section system2">
+                <div class="system-header">
+                    터틀 System 2 (장기)
+                    <div class="stock-count">{{ system2_stocks|length }}개 종목</div>
+                </div>
+                
+                {% if system2_stocks %}
+                <table class="stock-table">
+                    <thead>
+                        <tr>
+                            <th>종목코드</th>
+                            <th>종목명</th>
+                            <th>현재가</th>
+                            <th>등락률</th>
+                            <th>거래량</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stock in system2_stocks %}
+                        <tr>
+                            <td class="stock-code">{{ stock.code }}</td>
+                            <td class="stock-name">{{ stock.name }}</td>
+                            <td class="price">
+                                {% if stock.current %}
+                                    {{ "{:,}".format(stock.current|int) }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td class="price {% if stock.rate and stock.rate|float > 0 %}positive{% elif stock.rate and stock.rate|float < 0 %}negative{% else %}neutral{% endif %}">
+                                {% if stock.rate %}
+                                    {{ stock.rate }}%
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td class="volume">
+                                {% if stock.volume %}
+                                    {{ "{:,}".format(stock.volume|int) }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="no-data">
+                    System 2 신호가 감지된 종목이 없습니다.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- 새로고침 버튼 -->
+    <button class="refresh-btn" onclick="refreshData()">🔄 새로고침</button>
+    
+    <script>
+        function refreshData() {
+            const btn = document.querySelector('.refresh-btn');
+            btn.textContent = '새로고침 중...';
+            btn.disabled = true;
+            
+            fetch('/api/refresh')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        location.reload(); // 페이지 새로고침
+                    } else {
+                        alert('새로고침 실패: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    alert('오류가 발생했습니다: ' + error.message);
+                })
+                .finally(() => {
+                    btn.textContent = '🔄 새로고침';
+                    btn.disabled = false;
+                });
+        }
+        
+        // 30초마다 자동 새로고침
+        setInterval(() => {
+            location.reload();
+        }, 30000);
+    </script>
+</body>
+</html>
