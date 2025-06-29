@@ -6,8 +6,9 @@ import asyncio
 import time
 import websockets
 import requests
+import pandas as pd
 
-from typing import List, Dict, Optional
+from typing import Any, List, Dict, Optional
 from datetime import datetime, timedelta
 from config import Config
 
