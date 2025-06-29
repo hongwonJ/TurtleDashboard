@@ -97,8 +97,14 @@ th {
 }
 
 .entry-price {
-  color: #6f42c1;
-  font-weight: bold;
+    color: #6f42c1;
+    font-weight: bold;
+}
+
+.atr-value {
+    color: #17a2b8;
+    font-weight: bold;
+    background-color: #f0f8ff;
 }
 
 /* 종목 정보 */

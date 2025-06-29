@@ -1,11 +1,22 @@
 from flask import Blueprint, render_template, jsonify
 import logging
 from datetime import datetime
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    from backports.zoneinfo import ZoneInfo
 
 from scheduler.daily_scheduler import DailyScheduler
 from database.position_dao import PositionDAO
 
 logger = logging.getLogger(__name__)
+
+# KST 시간대 설정
+KST = ZoneInfo("Asia/Seoul")
+
+def get_kst_now():
+    """KST 기준 현재 시간 반환"""
+    return datetime.now(KST)
 
 # Blueprint 생성
 api_bp = Blueprint('api', __name__)
@@ -19,70 +30,94 @@ turtle_data_store = {
     'status': 'waiting'
 }
 
-def mock_turtle_scheduler():
-    """모의 터틀 스케줄러 (키움 API 대신)"""
+def real_turtle_scheduler():
+    """🔥 실제 키움 API 터틀 스케줄러"""
     global turtle_data_store
     
-    logger.info("오후 4시 터틀 스케줄러 실행!")
+    kst_now = get_kst_now()
+    logger.info(f"🚀 실제 키움 API 터틀 스케줄러 실행! [{kst_now.strftime('%Y-%m-%d %H:%M:%S KST')}]")
     
-    # 모의 데이터 생성 (실제로는 키움 API 호출)
+    try:
+        # 실제 DailyScheduler 사용
+        scheduler = DailyScheduler()
+        turtle_data_store['status'] = 'collecting'
+        
+        # 키움 API에서 실제 조건검색 결과 수집
+        logger.info("📡 키움 API 조건검색 실행 중...")
+        results = scheduler.fetch_turtle_signals()
+        
+        # System 별로 데이터 저장
+        system1_data = results.get('1', [])
+        system2_data = results.get('2', [])
+        
+        # 데이터 저장
+        turtle_data_store['system1'] = system1_data
+        turtle_data_store['system2'] = system2_data
+        turtle_data_store['last_updated'] = kst_now
+        turtle_data_store['status'] = 'updated'
+        
+        logger.info(f"✅ 실제 터틀 데이터 업데이트 완료: System1={len(system1_data)}개, System2={len(system2_data)}개")
+        
+        # 결과 요약 로그
+        for i, stock in enumerate(system1_data[:3]):
+            logger.info(f"  System1 [{i+1}] {stock.get('code')} {stock.get('name')} - 현재가: {stock.get('current'):,}원")
+        for i, stock in enumerate(system2_data[:3]):
+            logger.info(f"  System2 [{i+1}] {stock.get('code')} {stock.get('name')} - 현재가: {stock.get('current'):,}원")
+            
+    except Exception as e:
+        logger.error(f"❌ 실제 키움 API 호출 실패: {e}")
+        turtle_data_store['status'] = 'error'
+        
+        # 에러 시 Mock 데이터로 대체
+        logger.warning("⚠️  키움 API 실패로 Mock 데이터 사용")
+        mock_fallback_data()
+
+def mock_fallback_data():
+    """키움 API 실패시 대체 Mock 데이터"""
+    global turtle_data_store
+    
     import random
     
-    # System 1 (단기) 모의 데이터
-    system1_stocks = []
-    for i in range(random.randint(3, 8)):
-        stock_code = f"00{random.randint(1000, 9999)}"
-        current_price = random.randint(10000, 50000)
-        atr = random.randint(500, 2000)
-        
-        # 실제 종목명 예시
-        stock_names = ["삼성전자", "SK하이닉스", "NAVER", "카카오", "LG화학", "현대차", "기아", "POSCO홀딩스"]
-        stock_name = random.choice(stock_names)
-        
-        stock_data = {
-            'code': stock_code,
-            'name': stock_name,
-            'entry_date': datetime.now().strftime('%Y-%m-%d'),
-            'entry_price': current_price,
-            'current': current_price + random.randint(-1000, 1000),
-            'stop_loss': current_price - (2 * atr),
-            'trailing_stop': current_price - random.randint(800, 1200),
-            'add_position': current_price + (0.5 * atr),
-            'atr_20': atr
-        }
-        system1_stocks.append(stock_data)
+    # 간단한 Mock 데이터
+    real_stocks = [
+        {"code": "005930", "name": "삼성전자", "price": 70000, "atr": 1500},
+        {"code": "000660", "name": "SK하이닉스", "price": 100000, "atr": 3000},
+        {"code": "035420", "name": "NAVER", "price": 175000, "atr": 4500}
+    ]
     
-    # System 2 (장기) 모의 데이터  
-    system2_stocks = []
-    for i in range(random.randint(2, 6)):
-        stock_code = f"00{random.randint(1000, 9999)}"
-        current_price = random.randint(15000, 80000)
-        atr = random.randint(800, 3000)
-        
-        # 실제 종목명 예시
-        stock_names = ["삼성전자", "SK하이닉스", "NAVER", "카카오", "LG화학", "현대차", "기아", "POSCO홀딩스", "셀트리온", "LG에너지솔루션"]
-        stock_name = random.choice(stock_names)
-        
-        stock_data = {
-            'code': stock_code,
-            'name': stock_name,
-            'entry_date': datetime.now().strftime('%Y-%m-%d'),
-            'entry_price': current_price,
-            'current': current_price + random.randint(-2000, 2000),
-            'stop_loss': current_price - (2 * atr),
-            'trailing_stop': current_price - random.randint(1500, 2500),
-            'add_position': current_price + (0.5 * atr),
-            'atr_20': atr
-        }
-        system2_stocks.append(stock_data)
+    system1_data = []
+    system2_data = []
     
-    # 데이터 저장
-    turtle_data_store['system1'] = system1_stocks
-    turtle_data_store['system2'] = system2_stocks
-    turtle_data_store['last_updated'] = datetime.now()
-    turtle_data_store['status'] = 'updated'
+    for i, stock_info in enumerate(real_stocks):
+        if i < 2:  # System 1
+            system1_data.append({
+                'code': stock_info["code"],
+                'name': stock_info["name"],
+                'entry_date': get_kst_now().strftime('%Y-%m-%d'),
+                'entry_price': stock_info["price"],
+                'current': stock_info["price"] + random.randint(-1000, 1000),
+                'stop_loss': stock_info["price"] - (2 * stock_info["atr"]),
+                'trailing_stop': stock_info["price"] - random.randint(800, 1200),
+                'add_position': stock_info["price"] + (0.5 * stock_info["atr"]),
+                'atr_20': stock_info["atr"]
+            })
+        else:  # System 2
+            system2_data.append({
+                'code': stock_info["code"],
+                'name': stock_info["name"],
+                'entry_date': get_kst_now().strftime('%Y-%m-%d'),
+                'entry_price': stock_info["price"],
+                'current': stock_info["price"] + random.randint(-2000, 2000),
+                'stop_loss': stock_info["price"] - (2 * stock_info["atr"]),
+                'trailing_stop': stock_info["price"] - random.randint(1500, 2500),
+                'add_position': stock_info["price"] + (0.5 * stock_info["atr"]),
+                'atr_20': stock_info["atr"]
+            })
     
-    logger.info(f"터틀 데이터 업데이트 완료: System1={len(system1_stocks)}개, System2={len(system2_stocks)}개")
+    turtle_data_store['system1'] = system1_data
+    turtle_data_store['system2'] = system2_data
+    turtle_data_store['last_updated'] = get_kst_now()
+    turtle_data_store['status'] = 'mock_fallback'
 
 # 메인 페이지
 @main_bp.route('/')
@@ -125,17 +160,30 @@ def turtle_data():
 
 @api_bp.route('/manual-update', methods=['POST'])
 def manual_update():
-    """수동 업데이트"""
+    """🔥 실제 키움 API 수동 업데이트"""
     try:
-        logger.info("수동 업데이트 요청")
-        mock_turtle_scheduler()
+        kst_now = get_kst_now()
+        logger.info(f"🚀 실제 키움 API 수동 업데이트 요청 [{kst_now.strftime('%H:%M:%S')}]")
+        real_turtle_scheduler()
+        
+        status = turtle_data_store.get('status', 'unknown')
+        if status == 'updated':
+            message = '✅ 실제 키움 API 데이터 업데이트 완료!'
+        elif status == 'mock_fallback':
+            message = '⚠️ 키움 API 실패로 Mock 데이터 사용'
+        else:
+            message = f'❌ 업데이트 상태: {status}'
+            
         return jsonify({
             'status': 'success',
-            'message': '터틀 데이터 수동 업데이트 완료'
+            'message': message,
+            'data_status': status,
+            'system1_count': len(turtle_data_store.get('system1', [])),
+            'system2_count': len(turtle_data_store.get('system2', []))
         })
     except Exception as e:
         logger.error(f"수동 업데이트 실패: {e}")
         return jsonify({
             'status': 'error',
-            'message': f'업데이트 실패: {str(e)}'
+            'message': f'❌ 업데이트 실패: {str(e)}'
         })

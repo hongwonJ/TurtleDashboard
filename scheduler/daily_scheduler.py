@@ -6,6 +6,10 @@ import logging
 from datetime import datetime, date
 from typing import List, Dict, Optional
 from decimal import Decimal
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    from backports.zoneinfo import ZoneInfo
 from services.kiwoom_service import KiwoomAPIService
 from services.turtle_calculator import TurtleCalculator
 from database.position_dao import PositionDAO
@@ -15,6 +19,9 @@ from config import Config
 
 logger = logging.getLogger(__name__)
 
+# KST 시간대 설정
+KST = ZoneInfo("Asia/Seoul")
+
 class DailyScheduler:
     def __init__(self):
         self.kiwoom_service = KiwoomAPIService()
@@ -22,10 +29,15 @@ class DailyScheduler:
         self.position_dao = PositionDAO()
         self.db_handler = DatabaseHandler()
         self.logger = logging.getLogger(__name__)
+        self.kst = KST  # KST 시간대 참조
         # 조건검색 seq 번호들을 동적으로 찾기
         self.condition_sequences = []
         self.system_seq_mapping = {}  # seq -> system name 매핑
         self._initialize_system_sequences()
+
+    def get_kst_now(self):
+        """KST 기준 현재 시간 반환"""
+        return datetime.now(self.kst)
 
     def _initialize_system_sequences(self):
         """조건식 목록에서 System 1, System 2에 해당하는 seq을 찾아 초기화"""
@@ -261,7 +273,8 @@ class DailyScheduler:
 
     async def save_condition_results(self, results: Dict[str, List[Dict[str, str]]]) -> None:
         """결과 저장 (로그 또는 DB)"""
-        ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        kst_now = self.get_kst_now()
+        ts = kst_now.strftime('%Y-%m-%d %H:%M:%S KST')
         self.logger.info(f"조건검색 결과 저장 시작: {ts}")
         for seq, stocks in results.items():
             self.logger.info(f"조건식 {seq}: {len(stocks)}개 저장")
@@ -283,7 +296,8 @@ class DailyScheduler:
     def start_scheduler(self) -> None:
         """스케줄러 시작 (백그라운드 루프 실행)"""
         schedule.every().day.at("16:00").do(self.run_condition_collection)
-        self.logger.info("스케줄러 등록 완료: 매일 16:00 실행")
+        kst_now = self.get_kst_now()
+        self.logger.info(f"스케줄러 등록 완료: 매일 KST 16:00 실행 (현재: {kst_now.strftime('%Y-%m-%d %H:%M:%S KST')})")
         # 초기 실행
         self.run_condition_collection()
         while True:

@@ -13,7 +13,7 @@
         <div class="status">
             <strong>상태:</strong> {{ status }}
             {% if last_updated %}
-            | <strong>마지막 업데이트:</strong> {{ last_updated.strftime('%Y-%m-%d %H:%M:%S') }}
+            | <strong>마지막 업데이트:</strong> {{ last_updated.strftime('%Y-%m-%d %H:%M:%S KST') }}
             {% endif %}
             <br>
             <button class="refresh-btn" onclick="window.location.reload()">새로고침</button>
@@ -34,7 +34,7 @@
                 <thead>
                     <tr>
                         <th>종목명</th><th>종목코드</th><th>진입일</th><th>진입가</th>
-                        <th>현재가</th><th>손절가</th><th>트레일링</th><th>추가매수</th>
+                        <th>현재가</th><th>ATR</th><th>손절가</th><th>트레일링</th><th>추가매수</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -45,6 +45,7 @@
                         <td>{{ stock.entry_date }}</td>
                         <td class="price entry-price">{{ "{:,}".format(stock.entry_price|int) }}</td>
                         <td class="price">{{ "{:,}".format(stock.current|int) }}</td>
+                        <td class="price atr-value">{{ "{:,}".format(stock.atr_20|int) }}</td>
                         <td class="price stop-loss">{{ "{:,}".format(stock.stop_loss|int) }}</td>
                         <td class="price trailing-stop">{{ "{:,}".format(stock.trailing_stop|int) }}</td>
                         <td class="price add-position">{{ "{:,}".format(stock.add_position|int) }}</td>
@@ -65,7 +66,7 @@
                 <thead>
                     <tr>
                         <th>종목명</th><th>종목코드</th><th>진입일</th><th>진입가</th>
-                        <th>현재가</th><th>손절가</th><th>트레일링</th><th>추가매수</th>
+                        <th>현재가</th><th>ATR</th><th>손절가</th><th>트레일링</th><th>추가매수</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -76,6 +77,7 @@
                         <td>{{ stock.entry_date }}</td>
                         <td class="price entry-price">{{ "{:,}".format(stock.entry_price|int) }}</td>
                         <td class="price">{{ "{:,}".format(stock.current|int) }}</td>
+                        <td class="price atr-value">{{ "{:,}".format(stock.atr_20|int) }}</td>
                         <td class="price stop-loss">{{ "{:,}".format(stock.stop_loss|int) }}</td>
                         <td class="price trailing-stop">{{ "{:,}".format(stock.trailing_stop|int) }}</td>
                         <td class="price add-position">{{ "{:,}".format(stock.add_position|int) }}</td>
