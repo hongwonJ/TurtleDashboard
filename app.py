@@ -56,6 +56,20 @@ def create_app():
     def test_db():
         logger.info("DB 연결 테스트 요청")
         try:
+            # 연결 정보 먼저 확인
+            import os
+            host = os.getenv('AZURE_MYSQL_HOST')
+            username = os.getenv('AZURE_MYSQL_USER')
+            
+            # Azure MySQL 사용자명 형식 확인
+            if '@' not in username and host:
+                server_name = host.split('.')[0]
+                full_username = f"{username}@{server_name}"
+            else:
+                full_username = username
+            
+            logger.info(f"연결 시도: {full_username}@{host}")
+            
             # DB 연결 테스트
             from database.connection import DatabaseConnection
             db_conn = DatabaseConnection()
@@ -72,6 +86,7 @@ def create_app():
             return jsonify({
                 'status': 'success',
                 'message': 'DB 연결 성공',
+                'username_used': full_username,
                 'test_query_result': result[0] if result else None
             })
             
@@ -79,7 +94,9 @@ def create_app():
             logger.error(f"DB 연결 실패: {e}")
             return jsonify({
                 'status': 'error', 
-                'message': f'DB 연결 실패: {str(e)}'
+                'message': f'DB 연결 실패: {str(e)}',
+                'username_attempted': full_username if 'full_username' in locals() else username,
+                'host': host
             })
     
     logger.info("Flask 앱 설정 완료")

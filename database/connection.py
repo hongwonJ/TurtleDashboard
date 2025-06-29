@@ -17,18 +17,26 @@ class DatabaseConnection:
     def _initialize_pool(self):
         """Azure MySQL 서버용 커넥션 풀 초기화"""
         try:
+            # Azure MySQL 사용자명 형식 확인
+            username = Config.DB_USERNAME
+            if '@' not in username and Config.DB_HOST:
+                # Azure MySQL은 보통 username@servername 형식 필요
+                server_name = Config.DB_HOST.split('.')[0]  # turtledashboard-server
+                username = f"{Config.DB_USERNAME}@{server_name}"
+            
             config = {
-                'user': Config.DB_USERNAME,
+                'user': username,
                 'password': Config.DB_PASSWORD,
                 'host': Config.DB_HOST,
                 'port': Config.DB_PORT,
                 'database': Config.DB_DATABASE,
                 'charset': 'utf8mb4',
-                'collation': 'utf8mb4_unicode_ci',
                 'autocommit': False,
                 'pool_name': 'turtle_pool',
-                'pool_size': 10,
-                'pool_reset_session': True
+                'pool_size': 5,
+                'pool_reset_session': True,
+                'ssl_disabled': False,
+                'use_unicode': True
             }
             self._pool = pooling.MySQLConnectionPool(**config)
             logging.info("Azure MySQL 커넥션 풀 초기화 완료")
