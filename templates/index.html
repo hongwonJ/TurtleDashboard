@@ -22,7 +22,7 @@
         </div>
         
         <div class="systems-container">
-            <!-- System 1 -->
+                            <!-- System 1 -->
             <div class="system-section system1">
                 <div class="system-header">
                     터틀 System 1 (단기)
@@ -36,9 +36,12 @@
                             <tr>
                                 <th scope="col">종목코드</th>
                                 <th scope="col">종목명</th>
+                                <th scope="col">진입일</th>
+                                <th scope="col">진입가</th>
                                 <th scope="col">현재가</th>
-                                <th scope="col">등락률</th>
-                                <th scope="col">거래량</th>
+                                <th scope="col">손절가</th>
+                                <th scope="col">트레일링</th>
+                                <th scope="col">추가매수</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -46,11 +49,12 @@
                             <tr>
                                 <td class="stock-code">{{ stock.code }}</td>
                                 <td class="stock-name">{{ stock.name }}</td>
+                                <td class="date">{{ stock.entry_date or '-' }}</td>
+                                <td class="price entry-price">{{ stock.entry_price ? "{:,}".format(stock.entry_price|int) : '-' }}</td>
                                 <td class="price">{{ stock.current ? "{:,}".format(stock.current|int) : '-' }}</td>
-                                <td class="price {% if stock.rate and stock.rate|float > 0 %}positive{% elif stock.rate and stock.rate|float < 0 %}negative{% else %}neutral{% endif %}">
-                                    {{ stock.rate ? stock.rate ~ '%' : '-' }}
-                                </td>
-                                <td class="volume">{{ stock.volume ? "{:,}".format(stock.volume|int) : '-' }}</td>
+                                <td class="price stop-loss">{{ stock.stop_loss ? "{:,}".format(stock.stop_loss|int) : '-' }}</td>
+                                <td class="price trailing-stop">{{ stock.trailing_stop ? "{:,}".format(stock.trailing_stop|int) : '-' }}</td>
+                                <td class="price add-position">{{ stock.add_position ? "{:,}".format(stock.add_position|int) : '-' }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -75,9 +79,12 @@
                             <tr>
                                 <th scope="col">종목코드</th>
                                 <th scope="col">종목명</th>
+                                <th scope="col">진입일</th>
+                                <th scope="col">진입가</th>
                                 <th scope="col">현재가</th>
-                                <th scope="col">등락률</th>
-                                <th scope="col">거래량</th>
+                                <th scope="col">손절가</th>
+                                <th scope="col">트레일링</th>
+                                <th scope="col">추가매수</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -85,11 +92,12 @@
                             <tr>
                                 <td class="stock-code">{{ stock.code }}</td>
                                 <td class="stock-name">{{ stock.name }}</td>
+                                <td class="date">{{ stock.entry_date or '-' }}</td>
+                                <td class="price entry-price">{{ stock.entry_price ? "{:,}".format(stock.entry_price|int) : '-' }}</td>
                                 <td class="price">{{ stock.current ? "{:,}".format(stock.current|int) : '-' }}</td>
-                                <td class="price {% if stock.rate and stock.rate|float > 0 %}positive{% elif stock.rate and stock.rate|float < 0 %}negative{% else %}neutral{% endif %}">
-                                    {{ stock.rate ? stock.rate ~ '%' : '-' }}
-                                </td>
-                                <td class="volume">{{ stock.volume ? "{:,}".format(stock.volume|int) : '-' }}</td>
+                                <td class="price stop-loss">{{ stock.stop_loss ? "{:,}".format(stock.stop_loss|int) : '-' }}</td>
+                                <td class="price trailing-stop">{{ stock.trailing_stop ? "{:,}".format(stock.trailing_stop|int) : '-' }}</td>
+                                <td class="price add-position">{{ stock.add_position ? "{:,}".format(stock.add_position|int) : '-' }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>

@@ -18,11 +18,11 @@ class DatabaseConnection:
         """Azure MySQL 서버용 커넥션 풀 초기화"""
         try:
             config = {
-                'user': 'dtcavdpqlk',
-                'password': Config.DB_PASSWORD,  # config.py에 실제 비밀번호 입력 필요
-                'host': 'turtledashboard-server.mysql.database.azure.com',
-                'port': 3306,
-                'database': 'turtledashboard-database',  # 실제 DB명으로 변경 필요
+                'user': Config.DB_USERNAME,
+                'password': Config.DB_PASSWORD,
+                'host': Config.DB_HOST,
+                'port': Config.DB_PORT,
+                'database': Config.DB_DATABASE,
                 'charset': 'utf8mb4',
                 'collation': 'utf8mb4_unicode_ci',
                 'autocommit': False,

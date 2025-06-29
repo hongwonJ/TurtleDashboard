@@ -163,3 +163,72 @@ class TurtleCalculator:
             )
         
         return signal
+
+    def calculate_current_levels(self, df: pd.DataFrame, system_type: int = 1) -> dict:
+        """
+        현재 종목의 손절가/트레일링 스탑 계산 (이미 조건검색으로 신호를 받은 종목용)
+        
+        :param df: 일봉 데이터 (컬럼: date, open, high, low, close, volume)
+        :param system_type: 1 또는 2
+        :return: 손절가, 트레일링 스탑, ATR 정보
+        """
+        if len(df) < 60:  # 최소 60일 데이터 필요
+            return {}
+        
+        try:
+            # 데이터를 오래된 순으로 정렬 (계산용)
+            df_calc = df.sort_values('date').reset_index(drop=True)
+            
+            # 컬럼명을 기존 함수에 맞게 변경
+            df_calc = df_calc.rename(columns={
+                'high': 'high_price',
+                'low': 'low_price', 
+                'close': 'close_price'
+            })
+            
+            # ATR 계산 (20일)
+            atr_20 = self.calculate_atr(df_calc, 20)
+            current_atr = atr_20.iloc[-1]
+            
+            if pd.isna(current_atr):
+                return {}
+            
+            # 현재가
+            current_price = df_calc['close_price'].iloc[-1]
+            
+            # 시스템별 트레일링 스탑 설정
+            if system_type == 1:
+                # System 1: 10일 돈치안 하한선
+                exit_period = 10
+            else:
+                # System 2: 20일 돈치안 하한선
+                exit_period = 20
+            
+            # 트레일링 스탑용 돈치안 채널 계산
+            exit_high, exit_low = self.calculate_donchian_channel(df_calc, exit_period)
+            current_exit_low = exit_low.iloc[-1]
+            
+            if pd.isna(current_exit_low):
+                return {}
+            
+            # 손절가: 2ATR 손절
+            atr_stop_loss = current_price - (2 * current_atr)
+            
+            # 트레일링 스탑: 돈치안 하한선
+            trailing_stop = current_exit_low
+            
+            # 추가 매수가 (0.5ATR 위)
+            add_position = current_price + (0.5 * current_atr)
+            
+            return {
+                'current_price': round(float(current_price), 2),
+                'stop_loss': round(float(atr_stop_loss), 2),
+                'trailing_stop': round(float(trailing_stop), 2),
+                'add_position': round(float(add_position), 2),
+                'atr_20': round(float(current_atr), 4),
+                'exit_period': exit_period
+            }
+            
+        except Exception as e:
+            self.logger.error(f"손절/트레일링 스탑 계산 오류: {e}")
+            return {}

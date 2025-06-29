@@ -82,20 +82,24 @@ class DatabaseHandler:
                     signal_id INT NOT NULL,
                     entry_date DATE NOT NULL,
                     entry_price DECIMAL(12,2) NOT NULL,
-                    quantity INT NOT NULL,
-                    current_stop_loss DECIMAL(12,2) NOT NULL,
-                    current_take_profit DECIMAL(12,2) NOT NULL,
-                    current_add_position DECIMAL(12,2) NOT NULL,
+                    entry_atr DECIMAL(12,4) NOT NULL COMMENT '진입시 ATR (고정)',
+                    fixed_stop_loss DECIMAL(12,2) NOT NULL COMMENT '진입시 계산된 고정 손절가',
+                    system_type TINYINT NOT NULL COMMENT '1:시스템1, 2:시스템2',
+                    quantity INT DEFAULT 0,
+                    current_trailing_stop DECIMAL(12,2) NULL COMMENT '현재 트레일링 스탑',
+                    current_add_position DECIMAL(12,2) NULL COMMENT '현재 추가매수가',
                     is_closed BOOLEAN DEFAULT FALSE,
                     exit_date DATE NULL,
                     exit_price DECIMAL(12,2) NULL,
+                    exit_reason VARCHAR(20) NULL COMMENT 'STOP_LOSS, TRAILING, MANUAL',
                     profit_loss DECIMAL(15,2) NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     FOREIGN KEY (signal_id) REFERENCES turtle_signals(id),
                     INDEX idx_stock_code (stock_code),
                     INDEX idx_entry_date (entry_date),
-                    INDEX idx_is_closed (is_closed)
+                    INDEX idx_is_closed (is_closed),
+                    INDEX idx_system_type (system_type)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """
         }

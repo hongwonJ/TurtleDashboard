@@ -52,19 +52,20 @@ async function updateTables() {
     }
     noData.style.display = 'none';
 
-    stocks.forEach(stock => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td class="stock-code">${stock.code}</td>
-        <td class="stock-name">${stock.name}</td>
-        <td class="price">${stock.current != null ? stock.current.toLocaleString() : '-'}</td>
-        <td class="price ${stock.rate > 0 ? 'positive' : stock.rate < 0 ? 'negative' : 'neutral'}">
-          ${stock.rate != null ? stock.rate + '%' : '-'}
-        </td>
-        <td class="volume">${stock.volume != null ? stock.volume.toLocaleString() : '-'}</td>
-      `;
-      tbody.appendChild(tr);
-    });
+          stocks.forEach(stock => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="stock-code">${stock.code}</td>
+          <td class="stock-name">${stock.name}</td>
+          <td class="date">${stock.entry_date || '-'}</td>
+          <td class="price entry-price">${stock.entry_price != null ? Math.round(stock.entry_price).toLocaleString() : '-'}</td>
+          <td class="price">${stock.current != null ? stock.current.toLocaleString() : '-'}</td>
+          <td class="price stop-loss">${stock.stop_loss != null ? Math.round(stock.stop_loss).toLocaleString() : '-'}</td>
+          <td class="price trailing-stop">${stock.trailing_stop != null ? Math.round(stock.trailing_stop).toLocaleString() : '-'}</td>
+          <td class="price add-position">${stock.add_position != null ? Math.round(stock.add_position).toLocaleString() : '-'}</td>
+        `;
+        tbody.appendChild(tr);
+      });
   };
 
   render('.system1 .stock-table', system1);

@@ -3,6 +3,7 @@ import logging
 from datetime import datetime
 
 from scheduler.daily_scheduler import DailyScheduler
+from database.position_dao import PositionDAO
 
 logger = logging.getLogger(__name__)
 
@@ -13,25 +14,53 @@ main_bp = Blueprint('main', __name__)
 
 def get_turtle_data():
     """
-    TurtleScheduler 역할: DailyScheduler를 사용해 조건검색(터틀) 신호를 수집하고,
-    시스템별 종목 리스트와 마지막 업데이트 시간을 반환합니다.
+    DB에서 활성 포지션 데이터를 가져와서 시스템별로 분류하여 반환
     """
-    scheduler = DailyScheduler()
-    # fetch_turtle_signals는 내부적으로 run_condition_collection을 호출합니다.
-    results = scheduler.fetch_turtle_signals()
-
-    # 시스템 1, 시스템 2 구분
-    system1 = results.get('1', [])
-    system2 = results.get('2', [])
-
-    # 마지막 업데이트 시각
-    last_updated = datetime.now()
-
-    return {
-        'system1': system1,
-        'system2': system2,
-        'last_updated': last_updated
-    }
+    try:
+        position_dao = PositionDAO()
+        active_positions = position_dao.get_active_positions()
+        
+        # 시스템별로 분류
+        system1 = []
+        system2 = []
+        
+        for position in active_positions:
+            # 포지션 데이터를 웹페이지 형식으로 변환
+            stock_data = {
+                'code': position.stock_code,
+                'name': f'종목{position.stock_code}',  # 종목명은 별도 조회 필요
+                'current': None,  # 현재가는 실시간 API 필요
+                'rate': None,     # 등락률도 실시간 API 필요
+                'volume': None,   # 거래량도 실시간 API 필요
+                'stop_loss': float(position.fixed_stop_loss),
+                'trailing_stop': float(position.current_trailing_stop) if position.current_trailing_stop else None,
+                'add_position': float(position.current_add_position) if position.current_add_position else None,
+                'entry_date': position.entry_date.strftime('%Y-%m-%d'),
+                'entry_price': float(position.entry_price),
+                'position_id': position.id
+            }
+            
+            if position.system_type == 1:
+                system1.append(stock_data)
+            else:
+                system2.append(stock_data)
+        
+        # 마지막 업데이트 시각
+        last_updated = datetime.now()
+        
+        return {
+            'system1': system1,
+            'system2': system2,
+            'last_updated': last_updated
+        }
+        
+    except Exception as e:
+        logger.error(f"포지션 데이터 조회 실패: {e}")
+        return {
+            'system1': [],
+            'system2': [],
+            'last_updated': datetime.now()
+        }
 
 
 @main_bp.route('/')

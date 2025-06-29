@@ -79,9 +79,9 @@ body {
 
 .stock-table th,
 .stock-table td {
-  padding: 8px 12px;
+  padding: 6px 8px;
   text-align: left;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   border-bottom: 1px solid #ecf0f1;
 }
 
@@ -101,6 +101,11 @@ body {
 .negative { color: #3498db; }
 .neutral { color: #7f8c8d; }
 .volume { text-align: right; font-size: 0.85rem; }
+.stop-loss { color: #e74c3c; font-weight: 700; }
+.trailing-stop { color: #9b59b6; font-weight: 700; }
+.add-position { color: #f39c12; font-weight: 600; }
+.entry-price { color: #6f42c1; font-weight: 600; text-align: right; }
+.date { color: #6c757d; font-size: 0.8rem; font-weight: 500; text-align: center; }
 
 .no-data {
   padding: 30px;
