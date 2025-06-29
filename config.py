@@ -12,7 +12,7 @@ class Config:
     
     # MySQL 데이터베이스 설정 (Azure Web App + Database)
     DB_HOST = os.getenv('AZURE_MYSQL_HOST')
-    DB_PORT = int(os.getenv('DB_PORT', 3306))  # 포트는 별도 환경변수로 관리
+    DB_PORT = 3306  # MySQL 기본 포트
     DB_DATABASE = os.getenv('AZURE_MYSQL_NAME')
     DB_USERNAME = os.getenv('AZURE_MYSQL_USER')
     DB_PASSWORD = os.getenv('AZURE_MYSQL_PASSWORD')
