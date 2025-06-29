@@ -33,10 +33,15 @@ class DatabaseConnection:
                 'charset': 'utf8mb4',
                 'autocommit': False,
                 'pool_name': 'turtle_pool',
-                'pool_size': 5,
+                'pool_size': 3,
                 'pool_reset_session': True,
+                'ssl_verify_cert': False,  # Azure MySQL SSL 문제 해결
+                'ssl_verify_identity': False,
                 'ssl_disabled': False,
-                'use_unicode': True
+                'use_unicode': True,
+                'sql_mode': 'TRADITIONAL',
+                'connect_timeout': 30,
+                'auth_plugin': 'mysql_native_password'
             }
             self._pool = pooling.MySQLConnectionPool(**config)
             logging.info("Azure MySQL 커넥션 풀 초기화 완료")
