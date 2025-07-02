@@ -37,37 +37,71 @@ def update_turtle_data():
     logger.info(f"🚀 터틀 데이터 업데이트 시작 [{kst_now.strftime('%Y-%m-%d %H:%M:%S KST')}]")
     
     try:
-        # DailyScheduler로 실제 키움 API 호출
-        scheduler = DailyScheduler()
+        # DailyScheduler 초기화
+        turtle_data_store['status'] = 'initializing'
+        scheduler = None
+        
+        try:
+            scheduler = DailyScheduler()
+            logger.info("📡 DailyScheduler 초기화 완료")
+        except Exception as init_error:
+            logger.error(f"DailyScheduler 초기화 실패: {init_error}")
+            raise Exception(f"Scheduler initialization failed: {init_error}")
+        
+        # 키움 API 호출
         turtle_data_store['status'] = 'collecting'
-        
         logger.info("📡 키움 API 조건검색 실행 중...")
-        results = scheduler.fetch_turtle_signals()
         
-        # System 별로 데이터 저장
-        system1_data = results.get('1', [])
-        system2_data = results.get('2', [])
+        try:
+            results = scheduler.fetch_turtle_signals()
+            
+            if not isinstance(results, dict):
+                raise Exception(f"Invalid results format: {type(results)}")
+                
+        except Exception as api_error:
+            logger.error(f"키움 API 호출 실패: {api_error}")
+            raise Exception(f"Kiwoom API call failed: {api_error}")
         
-        # 데이터 저장
-        turtle_data_store['system1'] = system1_data
-        turtle_data_store['system2'] = system2_data
-        turtle_data_store['last_updated'] = kst_now
-        turtle_data_store['status'] = 'updated'
-        
-        logger.info(f"✅ 터틀 데이터 업데이트 완료: System1={len(system1_data)}개, System2={len(system2_data)}개")
-        
-        # 결과 요약 로그
-        for i, stock in enumerate(system1_data[:3]):
-            logger.info(f"  System1 [{i+1}] {stock.get('code')} {stock.get('name')} - 현재가: {stock.get('current'):,}원")
-        for i, stock in enumerate(system2_data[:3]):
-            logger.info(f"  System2 [{i+1}] {stock.get('code')} {stock.get('name')} - 현재가: {stock.get('current'):,}원")
+        # 데이터 검증 및 저장
+        try:
+            system1_data = results.get('1', []) if results else []
+            system2_data = results.get('2', []) if results else []
+            
+            # 데이터 타입 검증
+            if not isinstance(system1_data, list):
+                system1_data = []
+            if not isinstance(system2_data, list):
+                system2_data = []
+            
+            # 데이터 저장
+            turtle_data_store['system1'] = system1_data
+            turtle_data_store['system2'] = system2_data
+            turtle_data_store['last_updated'] = kst_now
+            turtle_data_store['status'] = 'updated'
+            
+            logger.info(f"✅ 터틀 데이터 업데이트 완료: System1={len(system1_data)}개, System2={len(system2_data)}개")
+            
+            # 안전한 결과 요약 로그
+            for i, stock in enumerate(system1_data[:3]):
+                if isinstance(stock, dict):
+                    current = stock.get('current', 0)
+                    logger.info(f"  System1 [{i+1}] {stock.get('code', 'N/A')} {stock.get('name', 'N/A')} - 현재가: {current}")
+            for i, stock in enumerate(system2_data[:3]):
+                if isinstance(stock, dict):
+                    current = stock.get('current', 0)
+                    logger.info(f"  System2 [{i+1}] {stock.get('code', 'N/A')} {stock.get('name', 'N/A')} - 현재가: {current}")
+                    
+        except Exception as save_error:
+            logger.error(f"데이터 저장 실패: {save_error}")
+            raise Exception(f"Data save failed: {save_error}")
             
     except Exception as e:
-        logger.error(f"❌ 키움 API 호출 실패: {e}")
+        logger.error(f"❌ 터틀 데이터 업데이트 실패: {e}")
         turtle_data_store['status'] = 'error'
         turtle_data_store['system1'] = []
         turtle_data_store['system2'] = []
         turtle_data_store['last_updated'] = kst_now
+        raise e  # 상위로 예외 전파
 
 # 메인 페이지
 @main_bp.route('/')
@@ -114,15 +148,27 @@ def manual_update():
     try:
         kst_now = get_kst_now()
         logger.info(f"🚀 수동 업데이트 요청 [{kst_now.strftime('%H:%M:%S')}]")
-        update_turtle_data()
+        
+        # 안전한 업데이트 호출
+        try:
+            update_turtle_data()
+        except Exception as update_error:
+            logger.error(f"업데이트 중 오류 발생: {update_error}")
+            return jsonify({
+                'status': 'error',
+                'message': 'Update failed - check server logs',
+                'data_status': 'error',
+                'system1_count': 0,
+                'system2_count': 0
+            })
         
         status = turtle_data_store.get('status', 'unknown')
         if status == 'updated':
-            message = '✅ 터틀 데이터 업데이트 완료!'
+            message = 'Update completed successfully'
         elif status == 'error':
-            message = '❌ 키움 API 호출 실패'
+            message = 'Kiwoom API call failed'
         else:
-            message = f'상태: {status}'
+            message = f'Status: {status}'
             
         return jsonify({
             'status': 'success',
@@ -132,8 +178,11 @@ def manual_update():
             'system2_count': len(turtle_data_store.get('system2', []))
         })
     except Exception as e:
-        logger.error(f"수동 업데이트 실패: {e}")
+        logger.error(f"Manual update failed: {e}")
         return jsonify({
             'status': 'error',
-            'message': f'❌ 업데이트 실패: {str(e)}'
+            'message': 'Server error occurred',
+            'data_status': 'error',
+            'system1_count': 0,
+            'system2_count': 0
         })

@@ -25,7 +25,29 @@ function manualUpdate() {
             'Content-Type': 'application/json'
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('응답 상태:', response.status);
+        
+        if (!response.ok) {
+            throw new Error(`서버 오류: ${response.status}`);
+        }
+        
+        // 응답 텍스트 먼저 확인
+        return response.text();
+    })
+    .then(text => {
+        console.log('응답 텍스트:', text.substring(0, 100));
+        
+        try {
+            // 안전한 JSON 파싱
+            const data = JSON.parse(text);
+            return data;
+        } catch (jsonError) {
+            console.error('JSON 파싱 오류:', jsonError);
+            console.error('응답 내용:', text);
+            throw new Error('서버 응답 형식 오류');
+        }
+    })
     .then(data => {
         console.log('업데이트 결과:', data);
         
