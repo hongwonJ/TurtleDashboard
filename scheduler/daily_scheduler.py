@@ -26,10 +26,21 @@ class DailyScheduler:
     def __init__(self):
         self.kiwoom_service = KiwoomAPIService()
         self.turtle_calculator = TurtleCalculator()
-        self.position_dao = PositionDAO()
-        self.db_handler = DatabaseHandler()
         self.logger = logging.getLogger(__name__)
         self.kst = KST  # KST 시간대 참조
+        
+        # DB 연결 시도 (실패해도 계속 진행)
+        self.db_available = False
+        try:
+            self.position_dao = PositionDAO()
+            self.db_handler = DatabaseHandler()
+            self.db_available = True
+            self.logger.info("✅ 데이터베이스 연결 성공")
+        except Exception as e:
+            self.logger.warning(f"⚠️ 데이터베이스 연결 실패 (키움 API만 사용): {e}")
+            self.position_dao = None
+            self.db_handler = None
+        
         # 조건검색 seq 번호들을 동적으로 찾기
         self.condition_sequences = []
         self.system_seq_mapping = {}  # seq -> system name 매핑
@@ -71,7 +82,7 @@ class DailyScheduler:
             self.system_seq_mapping = {}
 
     async def _enhance_with_turtle_data(self, stocks: List[Dict[str, str]], system_type: int) -> List[Dict[str, str]]:
-        """조건검색 결과를 DB와 연동하여 포지션 관리"""
+        """조건검색 결과에 터틀 계산 데이터 추가"""
         enhanced_stocks = []
         
         for stock in stocks:
@@ -81,8 +92,13 @@ class DailyScheduler:
                     enhanced_stocks.append(stock)
                     continue
                 
-                # 기존 포지션 확인
-                existing_position = self.position_dao.get_position_by_stock(stock_code)
+                # DB 사용 가능시 기존 포지션 확인
+                existing_position = None
+                if self.db_available and self.position_dao:
+                    try:
+                        existing_position = self.position_dao.get_position_by_stock(stock_code)
+                    except Exception as e:
+                        self.logger.warning(f"DB 포지션 조회 실패: {e}")
                 
                 # 캔들 데이터 가져오기 (60일)
                 self.logger.info(f"캔들 데이터 조회 중: {stock_code} ({stock.get('name', '')})")
@@ -103,22 +119,21 @@ class DailyScheduler:
                     enhanced_stocks.append(enhanced_stock)
                     continue
                 
-                if existing_position:
+                # DB 사용 가능시만 포지션 관리
+                if self.db_available and existing_position:
                     # 기존 포지션: 트레일링 스탑만 업데이트
                     enhanced_stock = await self._update_existing_position(
                         stock, existing_position, turtle_data
                     )
                 else:
-                    # 신규 포지션: 새 포지션 생성
-                    enhanced_stock = await self._create_new_position(
-                        stock, turtle_data, system_type
-                    )
+                    # DB 없거나 신규: 계산된 터틀 데이터만 사용
+                    enhanced_stock = self._create_turtle_stock_data(stock, turtle_data)
                 
                 enhanced_stocks.append(enhanced_stock)
                 await asyncio.sleep(0.5)  # API 호출 간격
                 
             except Exception as e:
-                self.logger.error(f"포지션 관리 오류 ({stock.get('code', '')}): {e}")
+                self.logger.error(f"터틀 데이터 처리 오류 ({stock.get('code', '')}): {e}")
                 enhanced_stock = self._create_basic_stock_data(stock, None)
                 enhanced_stocks.append(enhanced_stock)
         
@@ -153,6 +168,26 @@ class DailyScheduler:
         
         return enhanced_stock
     
+    def _create_turtle_stock_data(self, stock: Dict[str, str], turtle_data: Dict) -> Dict[str, str]:
+        """DB 없이 계산된 터틀 데이터만으로 주식 데이터 생성"""
+        enhanced_stock = stock.copy()
+        
+        current_price = turtle_data.get('current_price')
+        atr_20 = turtle_data.get('atr_20')
+        
+        # 터틀 계산 결과 추가
+        enhanced_stock.update({
+            'stop_loss': current_price - (2 * atr_20),  # 손절가
+            'trailing_stop': turtle_data.get('trailing_stop'),  # 트레일링 스탑
+            'add_position': turtle_data.get('add_position'),  # 추가매수가
+            'atr_20': atr_20,
+            'entry_date': None,  # DB 없으므로 None
+            'entry_price': None,  # DB 없으므로 None
+            'position_id': None   # DB 없으므로 None
+        })
+        
+        return enhanced_stock
+    
     async def _update_existing_position(self, stock: Dict[str, str], position: TurtlePosition, 
                                        turtle_data: Dict) -> Dict[str, str]:
         """기존 포지션 업데이트 (트레일링 스탑만)"""
@@ -162,14 +197,17 @@ class DailyScheduler:
         new_trailing_stop = turtle_data.get('trailing_stop')
         new_add_position = turtle_data.get('add_position')
         
-        # DB 업데이트
-        self.position_dao.update_trailing_stop(
-            position.id, 
-            Decimal(str(new_trailing_stop)),
-            Decimal(str(new_add_position))
-        )
-        
-        self.logger.info(f"{stock_code}: 포지션 업데이트 - 트레일링: {new_trailing_stop}")
+        # DB 업데이트 시도
+        try:
+            if self.db_available and self.position_dao:
+                self.position_dao.update_trailing_stop(
+                    position.id, 
+                    Decimal(str(new_trailing_stop)),
+                    Decimal(str(new_add_position))
+                )
+                self.logger.info(f"{stock_code}: 포지션 업데이트 - 트레일링: {new_trailing_stop}")
+        except Exception as e:
+            self.logger.warning(f"포지션 업데이트 실패 ({stock_code}): {e}")
         
         # 기존 포지션 데이터 + 업데이트된 트레일링
         enhanced_stock = stock.copy()
@@ -187,7 +225,11 @@ class DailyScheduler:
     
     async def _create_new_position(self, stock: Dict[str, str], turtle_data: Dict, 
                                   system_type: int) -> Dict[str, str]:
-        """신규 포지션 생성"""
+        """신규 포지션 생성 (DB 사용 가능시만)"""
+        
+        if not self.db_available or not self.position_dao:
+            # DB 없으면 계산된 터틀 데이터만 반환
+            return self._create_turtle_stock_data(stock, turtle_data)
         
         stock_code = stock.get('code', '')
         current_price = turtle_data.get('current_price')
@@ -196,24 +238,28 @@ class DailyScheduler:
         # 고정 손절가 계산 (진입시 ATR로)
         fixed_stop_loss = current_price - (2 * current_atr)
         
-        # 새 포지션 생성
-        new_position = TurtlePosition(
-            stock_code=stock_code,
-            signal_id=0,  # 조건검색이므로 signal_id는 0
-            entry_date=date.today(),
-            entry_price=Decimal(str(current_price)),
-            entry_atr=Decimal(str(current_atr)),
-            fixed_stop_loss=Decimal(str(fixed_stop_loss)),
-            system_type=system_type,
-            quantity=0,
-            current_trailing_stop=Decimal(str(turtle_data.get('trailing_stop'))),
-            current_add_position=Decimal(str(turtle_data.get('add_position')))
-        )
-        
-        # DB에 저장
-        position_id = self.position_dao.create_position(new_position)
-        
-        self.logger.info(f"{stock_code}: 신규 포지션 생성 - 진입가: {current_price}, 손절가: {fixed_stop_loss}")
+        try:
+            # 새 포지션 생성
+            new_position = TurtlePosition(
+                stock_code=stock_code,
+                signal_id=0,  # 조건검색이므로 signal_id는 0
+                entry_date=date.today(),
+                entry_price=Decimal(str(current_price)),
+                entry_atr=Decimal(str(current_atr)),
+                fixed_stop_loss=Decimal(str(fixed_stop_loss)),
+                system_type=system_type,
+                quantity=0,
+                current_trailing_stop=Decimal(str(turtle_data.get('trailing_stop'))),
+                current_add_position=Decimal(str(turtle_data.get('add_position')))
+            )
+            
+            # DB에 저장
+            position_id = self.position_dao.create_position(new_position)
+            
+            self.logger.info(f"{stock_code}: 신규 포지션 생성 - 진입가: {current_price}, 손절가: {fixed_stop_loss}")
+        except Exception as e:
+            self.logger.error(f"포지션 저장 실패 ({stock_code}): {e}")
+            return self._create_turtle_stock_data(stock, turtle_data)
         
         # 새 포지션 데이터
         enhanced_stock = stock.copy()
