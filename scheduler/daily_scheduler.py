@@ -100,11 +100,11 @@ class DailyScheduler:
                     except Exception as e:
                         self.logger.warning(f"DB 포지션 조회 실패: {e}")
                 
-                # 캔들 데이터 가져오기 (60일)
+                # 캔들 데이터 가져오기 (30일로 단축)
                 self.logger.info(f"캔들 데이터 조회 중: {stock_code} ({stock.get('name', '')})")
-                candle_df = self.kiwoom_service.get_daily_candles(stock_code, count=60)
+                candle_df = self.kiwoom_service.get_daily_candles(stock_code, count=30)
                 
-                if candle_df.empty or len(candle_df) < 30:
+                if candle_df.empty or len(candle_df) < 20:
                     self.logger.warning(f"{stock_code}: 캔들 데이터 부족 ({len(candle_df)}일)")
                     enhanced_stock = self._create_basic_stock_data(stock, existing_position)
                     enhanced_stocks.append(enhanced_stock)
@@ -130,7 +130,7 @@ class DailyScheduler:
                     enhanced_stock = self._create_turtle_stock_data(stock, turtle_data)
                 
                 enhanced_stocks.append(enhanced_stock)
-                await asyncio.sleep(0.5)  # API 호출 간격
+                await asyncio.sleep(0.2)  # API 호출 간격 단축
                 
             except Exception as e:
                 self.logger.error(f"터틀 데이터 처리 오류 ({stock.get('code', '')}): {e}")
@@ -291,8 +291,15 @@ class DailyScheduler:
                     # seq를 시스템으로 매핑하여 결과 분류
                     system = self.system_seq_mapping.get(seq, seq)
                     
+                    # 종목 수 제한 (각 시스템당 최대 30개)
+                    max_stocks = 30
+                    limited_results = results[:max_stocks] if len(results) > max_stocks else results
+                    
+                    if len(results) > max_stocks:
+                        self.logger.warning(f"조건식 {seq}: {len(results)}개 → {max_stocks}개로 제한")
+                    
                     # 각 종목의 손절가/익절가 계산
-                    enhanced_results = await self._enhance_with_turtle_data(results, int(system))
+                    enhanced_results = await self._enhance_with_turtle_data(limited_results, int(system))
                     
                     if system in system_results:
                         system_results[system].extend(enhanced_results)

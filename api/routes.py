@@ -135,45 +135,62 @@ def health():
 @api_bp.route('/turtle-data')
 def turtle_data():
     """터틀 데이터 API"""
+    status = turtle_data_store.get('status', 'waiting')
+    
+    # 상태별 메시지
+    status_messages = {
+        'waiting': 'Waiting for update',
+        'initializing': 'Initializing Kiwoom API...',
+        'collecting': 'Collecting condition results...',
+        'updated': 'Data updated successfully',
+        'error': 'Update failed - check logs'
+    }
+    
     return jsonify({
         'system1': turtle_data_store.get('system1', []),
         'system2': turtle_data_store.get('system2', []),
         'last_updated': turtle_data_store.get('last_updated').isoformat() if turtle_data_store.get('last_updated') else None,
-        'status': turtle_data_store.get('status', 'waiting')
+        'status': status,
+        'status_message': status_messages.get(status, status),
+        'total_count': len(turtle_data_store.get('system1', [])) + len(turtle_data_store.get('system2', []))
     })
 
 @api_bp.route('/manual-update', methods=['POST'])
 def manual_update():
-    """수동 업데이트"""
+    """수동 업데이트 (백그라운드 실행)"""
     try:
         kst_now = get_kst_now()
         logger.info(f"🚀 수동 업데이트 요청 [{kst_now.strftime('%H:%M:%S')}]")
         
-        # 안전한 업데이트 호출
-        try:
-            update_turtle_data()
-        except Exception as update_error:
-            logger.error(f"업데이트 중 오류 발생: {update_error}")
+        # 이미 업데이트 중인지 확인
+        current_status = turtle_data_store.get('status', 'waiting')
+        if current_status in ['initializing', 'collecting']:
             return jsonify({
-                'status': 'error',
-                'message': 'Update failed - check server logs',
-                'data_status': 'error',
-                'system1_count': 0,
-                'system2_count': 0
+                'status': 'success',
+                'message': 'Update already in progress',
+                'data_status': current_status,
+                'system1_count': len(turtle_data_store.get('system1', [])),
+                'system2_count': len(turtle_data_store.get('system2', []))
             })
         
-        status = turtle_data_store.get('status', 'unknown')
-        if status == 'updated':
-            message = 'Update completed successfully'
-        elif status == 'error':
-            message = 'Kiwoom API call failed'
-        else:
-            message = f'Status: {status}'
-            
+        # 백그라운드에서 업데이트 시작
+        turtle_data_store['status'] = 'initializing'
+        
+        import threading
+        def background_update():
+            try:
+                update_turtle_data()
+            except Exception as e:
+                logger.error(f"백그라운드 업데이트 실패: {e}")
+        
+        thread = threading.Thread(target=background_update, daemon=True)
+        thread.start()
+        
+        # 즉시 응답 반환
         return jsonify({
             'status': 'success',
-            'message': message,
-            'data_status': status,
+            'message': 'Update started - please wait 1-2 minutes',
+            'data_status': 'initializing',
             'system1_count': len(turtle_data_store.get('system1', [])),
             'system2_count': len(turtle_data_store.get('system2', []))
         })

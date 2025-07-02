@@ -15,8 +15,7 @@
             {% if last_updated %}
             | <strong>마지막 업데이트:</strong> {{ last_updated.strftime('%Y-%m-%d %H:%M:%S KST') }}
             {% endif %}
-            <br>
-            <button class="update-btn" onclick="manualUpdate()">🔄 데이터 업데이트</button>
+            | <span class="auto-update-info">매일 오후 4시 자동 업데이트</span>
         </div>
         
         <!-- System 1 -->
@@ -90,7 +89,8 @@
             <small>
                 개발자 도구: 
                 <a href="/api/turtle-data" target="_blank">JSON 데이터</a> | 
-                <a href="/api/health" target="_blank">상태 확인</a>
+                <a href="/api/health" target="_blank">상태 확인</a> | 
+                <button class="update-btn-small" onclick="manualUpdate()">수동 업데이트</button>
             </small>
         </div>
     </footer>

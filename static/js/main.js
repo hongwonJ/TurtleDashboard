@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // 키움 API 데이터 업데이트 함수
 function manualUpdate() {
-    const btn = document.querySelector('.update-btn');
+    const btn = document.querySelector('.update-btn-small');
     const originalText = btn.textContent;
     
     // 버튼 상태 변경
@@ -52,11 +52,20 @@ function manualUpdate() {
         console.log('업데이트 결과:', data);
         
         if (data.status === 'success') {
-            // 성공 메시지 표시
-            btn.textContent = '✅ 완료!';
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
+            if (data.data_status === 'initializing') {
+                // 백그라운드 업데이트 시작됨
+                btn.textContent = '🔄 Processing...';
+                btn.disabled = true;
+                
+                // 진행 상황 주기적 확인
+                checkUpdateProgress(btn, originalText);
+            } else {
+                // 이미 완료된 상태
+                btn.textContent = '✅ 완료!';
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            }
         } else {
             throw new Error(data.message || '업데이트 실패');
         }
@@ -71,8 +80,53 @@ function manualUpdate() {
     });
 }
 
-// 5분마다 자동 페이지 새로고침 (새로운 데이터 확인용)
-setInterval(() => {
-    console.log('🔄 자동 새로고침 (5분 경과)');
-    window.location.reload();
-}, 5 * 60 * 1000);
+// 진행 상황 확인 함수
+function checkUpdateProgress(btn, originalText) {
+    let attempts = 0;
+    const maxAttempts = 120; // 2분 (1초마다 체크)
+    
+    const intervalId = setInterval(() => {
+        attempts++;
+        
+        fetch('/api/turtle-data')
+            .then(response => response.json())
+            .then(data => {
+                console.log(`진행 상황 [${attempts}/${maxAttempts}]:`, data.status_message);
+                
+                if (data.status === 'updated') {
+                    // 완료됨
+                    clearInterval(intervalId);
+                    btn.textContent = '✅ 완료!';
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else if (data.status === 'error') {
+                    // 오류 발생
+                    clearInterval(intervalId);
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                    alert('❌ 업데이트 실패 - 서버 로그를 확인하세요');
+                } else if (data.status === 'collecting') {
+                    // 수집 중
+                    btn.textContent = '📊 Collecting data...';
+                } else {
+                    // 초기화 중
+                    btn.textContent = '⚙️ Initializing...';
+                }
+                
+                // 최대 시간 초과
+                if (attempts >= maxAttempts) {
+                    clearInterval(intervalId);
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                    alert('⏰ 업데이트 시간 초과 - 페이지를 새로고침 해주세요');
+                }
+            })
+            .catch(error => {
+                console.error('진행 상황 확인 오류:', error);
+                // 오류가 발생해도 계속 시도
+            });
+    }, 1000); // 1초마다 확인
+}
+
+// 자동 새로고침 제거됨 - 오후 4시 스케줄 업데이트만 사용
