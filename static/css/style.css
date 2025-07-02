@@ -128,34 +128,64 @@ th {
 }
 
 /* 버튼 스타일 */
-.refresh-btn {
-  background: #3498db;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 5px;
-  cursor: pointer;
-  margin: 10px 5px;
+.update-btn {
+    background: #27ae60;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin: 10px 0;
+    font-size: 1rem;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.refresh-btn:hover {
-  background: #2980b9;
+.update-btn:hover {
+    background: #229954;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
 }
 
-/* API 링크 */
-.api-links {
-  text-align: center;
-  margin: 20px 0;
+.update-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.api-links a {
-  margin: 0 10px;
-  color: #3498db;
-  text-decoration: none;
+.update-btn:disabled {
+    background: #95a5a6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
-.api-links a:hover {
-  text-decoration: underline;
+/* 풋노트 */
+.footer {
+    margin-top: 40px;
+    padding: 20px 0;
+    border-top: 1px solid #ecf0f1;
+    background: #f8f9fa;
+}
+
+.footer-content {
+    text-align: center;
+    color: #7f8c8d;
+}
+
+.footer-content small {
+    font-size: 0.85rem;
+}
+
+.footer-content a {
+    color: #95a5a6;
+    text-decoration: none;
+    margin: 0 5px;
+}
+
+.footer-content a:hover {
+    color: #3498db;
+    text-decoration: underline;
 }
 
 /* 반응형 디자인 */
