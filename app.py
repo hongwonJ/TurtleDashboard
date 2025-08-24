@@ -50,8 +50,11 @@ def create_app():
     app.register_blueprint(main_bp)
     app.register_blueprint(api_bp, url_prefix='/api')
     
-    # 스케줄러 시작
-    start_daily_scheduler()
+    # 스케줄러 시작 (에러가 발생해도 앱은 계속 실행)
+    try:
+        start_daily_scheduler()
+    except Exception as e:
+        logger.error(f"스케줄러 시작 실패 (앱은 계속 실행): {e}")
     
     logger.info("터틀 대시보드 앱 설정 완료")
     return app

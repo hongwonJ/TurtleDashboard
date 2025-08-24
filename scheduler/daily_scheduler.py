@@ -45,8 +45,14 @@ class DailyScheduler:
         self.condition_sequences = []
         self.system_seq_mapping = {}  # seq -> system name 매핑
         
-        # 조건식 초기화 실행
-        self._initialize_system_sequences()
+        # 조건식 초기화 실행 (일시적으로 비활성화 - 앱 크래시 방지)
+        # self._initialize_system_sequences()
+        
+        # 임시 테스트용 하드코딩 (실제 seq 번호는 나중에 확인 필요)
+        self.logger.info("⚠️ 테스트 모드: 하드코딩된 조건식 사용")
+        # 실제 키움 조건식이 있다면 여기에 seq 번호 입력
+        # self.condition_sequences = ["1", "2"]  # 예시
+        # self.system_seq_mapping = {"1": "1", "2": "2"}
 
     def get_kst_now(self):
         """KST 기준 현재 시간 반환"""
