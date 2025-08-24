@@ -60,7 +60,22 @@ def create_app():
     return app
 
 # Flask 앱 생성 (gunicorn 접근용)
-app = create_app()
+try:
+    app = create_app()
+    logger.info("Flask 앱 생성 완료 - gunicorn에서 실행 중")
+except Exception as e:
+    logger.error(f"Flask 앱 생성 실패: {e}")
+    # 기본 Flask 앱이라도 만들어서 서버가 죽지 않도록
+    from flask import Flask
+    app = Flask(__name__)
+    
+    @app.route('/')
+    def error_page():
+        return f"앱 초기화 실패: {str(e)}", 500
+    
+    @app.route('/api/health')
+    def health():
+        return {"status": "error", "message": str(e)}, 500
 
 if __name__ == '__main__':
     import os
