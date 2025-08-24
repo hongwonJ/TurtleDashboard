@@ -14,9 +14,8 @@ from config import Config
 
 logger = logging.getLogger(__name__)
 
-# 디버그 로깅 활성화를 위한 설정
-if logger.level == logging.NOTSET:
-    logger.setLevel(logging.DEBUG)
+# 키움 서비스는 DEBUG 레벨로 상세 로깅
+logger.setLevel(logging.DEBUG)
 
 class KiwoomAPIService:
     def __init__(self):

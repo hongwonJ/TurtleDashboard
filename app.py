@@ -45,7 +45,6 @@ def start_daily_scheduler():
 
 def create_app():
     app = Flask(__name__)
-    logger.info("터틀 대시보드 앱 생성 중...")
     
     # Blueprint 등록
     app.register_blueprint(main_bp)

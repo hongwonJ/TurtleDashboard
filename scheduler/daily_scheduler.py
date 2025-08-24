@@ -44,6 +44,8 @@ class DailyScheduler:
         # 조건검색 seq 번호들을 동적으로 찾기
         self.condition_sequences = []
         self.system_seq_mapping = {}  # seq -> system name 매핑
+        
+        # 조건식 초기화 실행
         self._initialize_system_sequences()
 
     def get_kst_now(self):
@@ -278,11 +280,20 @@ class DailyScheduler:
     async def collect_condition_results(self) -> Dict[str, List[Dict[str, str]]]:
         """조건검색 결과 수집 (각 조건식 독립 처리)"""
         self.logger.info("=== 조건검색 결과 수집 시작 ===")
+        self.logger.info(f"📋 사용 가능한 조건식: {len(self.condition_sequences)}개")
+        self.logger.debug(f"조건식 리스트: {self.condition_sequences}")
+        self.logger.debug(f"시스템 매핑: {self.system_seq_mapping}")
+        
         try:
             seq_results: Dict[str, List[Dict[str, str]]] = {}
             system_results: Dict[str, List[Dict[str, str]]] = {"1": [], "2": []}
             
             total_conditions = len(self.condition_sequences)
+            
+            # 조건식이 없으면 조기 종료
+            if total_conditions == 0:
+                self.logger.error("❌ 조건식이 하나도 없습니다! 키움 API 조건식 설정을 확인하세요.")
+                return {"1": [], "2": []}
             for idx, seq in enumerate(self.condition_sequences, 1):
                 try:
                     self.logger.info(f"📊 조건식 {seq} 결과 조회 시작 ({idx}/{total_conditions})")
