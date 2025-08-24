@@ -63,5 +63,7 @@ def create_app():
 app = create_app()
 
 if __name__ == '__main__':
-    logger.info("터틀 대시보드 개발 서버 시작")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    import os
+    port = int(os.environ.get('PORT', 8080))
+    logger.info(f"터틀 대시보드 서버 시작 - 포트: {port}")
+    app.run(debug=False, host='0.0.0.0', port=port)
