@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, jsonify
+from flask import Blueprint, render_template, jsonify, request
 import logging
 from datetime import datetime
 try:
@@ -130,6 +130,30 @@ def health():
         'message': '터틀 대시보드 정상 작동',
         'data_status': turtle_data_store.get('status', 'waiting'),
         'last_updated': turtle_data_store.get('last_updated').isoformat() if turtle_data_store.get('last_updated') else None
+    })
+
+@api_bp.route('/debug/ip')
+def debug_ip():
+    """현재 웹앱의 outbound IP 확인"""
+    import os
+    import requests
+    
+    try:
+        # 외부 서비스로 현재 IP 확인
+        response = requests.get('https://httpbin.org/ip', timeout=10)
+        current_ip = response.json().get('origin', 'Unknown')
+    except:
+        current_ip = 'Failed to get IP'
+    
+    # Azure 환경변수에서 설정된 outbound IP들
+    outbound_ips = os.getenv('WEBSITE_OUTBOUND_IPS', 'Not set')
+    possible_outbound_ips = os.getenv('WEBSITE_POSSIBLE_OUTBOUND_IPS', 'Not set')
+    
+    return jsonify({
+        'current_outbound_ip': current_ip,
+        'azure_outbound_ips': outbound_ips,
+        'azure_possible_outbound_ips': possible_outbound_ips,
+        'client_ip': request.remote_addr if hasattr(request, 'remote_addr') else 'Unknown'
     })
 
 @api_bp.route('/turtle-data')

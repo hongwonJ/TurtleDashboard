@@ -276,52 +276,79 @@ class DailyScheduler:
         return enhanced_stock
 
     async def collect_condition_results(self) -> Dict[str, List[Dict[str, str]]]:
-        """조건검색 결과 수집"""
+        """조건검색 결과 수집 (각 조건식 독립 처리)"""
         self.logger.info("=== 조건검색 결과 수집 시작 ===")
         try:
             seq_results: Dict[str, List[Dict[str, str]]] = {}
             system_results: Dict[str, List[Dict[str, str]]] = {"1": [], "2": []}
             
-            for seq in self.condition_sequences:
+            total_conditions = len(self.condition_sequences)
+            for idx, seq in enumerate(self.condition_sequences, 1):
                 try:
-                    self.logger.info(f"조건식 {seq} 결과 조회 시작")
+                    self.logger.info(f"📊 조건식 {seq} 결과 조회 시작 ({idx}/{total_conditions})")
+                    
+                    # WebSocket 연결 안정화를 위한 대기
+                    if idx > 1:  # 첫 번째 조건식이 아니면 대기
+                        self.logger.info(f"⏳ WebSocket 안정화 대기 (3초)...")
+                        await asyncio.sleep(3)
+                    
                     results = await self.kiwoom_service.request_condition(seq)
                     seq_results[seq] = results
+                    
+                    if not results:
+                        self.logger.warning(f"⚠️ 조건식 {seq}: 결과가 없습니다")
+                        continue
                     
                     # seq를 시스템으로 매핑하여 결과 분류
                     system = self.system_seq_mapping.get(seq, seq)
                     
-                    # 종목 수 제한 (각 시스템당 최대 30개)
-                    max_stocks = 30
+                    # 종목 수 제한 (각 시스템당 최대 20개로 더 축소)
+                    max_stocks = 20
                     limited_results = results[:max_stocks] if len(results) > max_stocks else results
                     
                     if len(results) > max_stocks:
-                        self.logger.warning(f"조건식 {seq}: {len(results)}개 → {max_stocks}개로 제한")
+                        self.logger.warning(f"📊 조건식 {seq}: {len(results)}개 → {max_stocks}개로 제한")
                     
-                    # 각 종목의 손절가/익절가 계산
-                    enhanced_results = await self._enhance_with_turtle_data(limited_results, int(system))
+                    # 각 종목의 손절가/익절가 계산 (시간 단축을 위해 간소화)
+                    try:
+                        enhanced_results = await self._enhance_with_turtle_data(limited_results, int(system))
+                        
+                        if system in system_results:
+                            system_results[system].extend(enhanced_results)
+                        
+                        self.logger.info(f"✅ 조건식 {seq} (System {system}): {len(enhanced_results)}개 종목 처리 완료")
+                        
+                        # 상위 3개 종목 로깅
+                        for i, stock in enumerate(enhanced_results[:3]):
+                            current = stock.get('current', 0)
+                            self.logger.info(f"  🏆 {i+1}. {stock.get('code')} {stock.get('name')} - 현재가: {current:,}원")
+                        
+                        if len(enhanced_results) > 3:
+                            self.logger.info(f"  📈 ... 외 {len(enhanced_results) - 3}개 종목")
+                            
+                    except Exception as enhance_error:
+                        self.logger.error(f"❌ 조건식 {seq} 터틀 계산 실패: {enhance_error}")
+                        # 터틀 계산 실패해도 기본 결과는 저장
+                        if system in system_results:
+                            system_results[system].extend(limited_results)
                     
-                    if system in system_results:
-                        system_results[system].extend(enhanced_results)
-                    
-                    self.logger.info(f"조건식 {seq} (System {system}): {len(results)}개 종목 조회 완료")
-                    for i, stock in enumerate(results[:5]):
-                        self.logger.info(
-                            f"  {i+1}. {stock.get('code')} {stock.get('name')} - 현재가: {stock.get('current')}"
-                        )
-                    if len(results) > 5:
-                        self.logger.info(f"  ... 외 {len(results) - 5}개 종목")
-                    await asyncio.sleep(1)
                 except Exception as e:
-                    self.logger.error(f"조건식 {seq} 조회 실패: {e}")
+                    self.logger.error(f"❌ 조건식 {seq} 전체 처리 실패: {e}")
                     seq_results[seq] = []
+                    # 실패해도 다음 조건식 계속 처리
+                    continue
             
+            # 최종 결과 요약
             total = sum(len(v) for v in system_results.values())
-            self.logger.info(f"=== 총 {total}개 종목 조회 완료 (System 1: {len(system_results['1'])}개, System 2: {len(system_results['2'])}개) ===")
+            self.logger.info(f"🎯 === 조건검색 완료: 총 {total}개 종목 ===")
+            self.logger.info(f"   📊 System 1: {len(system_results['1'])}개")
+            self.logger.info(f"   📊 System 2: {len(system_results['2'])}개")
+            
             await self.save_condition_results(seq_results)
             return system_results
+            
         except Exception as e:
-            self.logger.error(f"collect_condition_results 오류: {e}")
+            self.logger.error(f"❌ collect_condition_results 전체 오류: {e}")
             return {"1": [], "2": []}
 
     async def save_condition_results(self, results: Dict[str, List[Dict[str, str]]]) -> None:

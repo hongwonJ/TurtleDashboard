@@ -14,6 +14,10 @@ from config import Config
 
 logger = logging.getLogger(__name__)
 
+# 디버그 로깅 활성화를 위한 설정
+if logger.level == logging.NOTSET:
+    logger.setLevel(logging.DEBUG)
+
 class KiwoomAPIService:
     def __init__(self):
         self.app_key       = Config.KIWOOM_APP_KEY
@@ -32,23 +36,45 @@ class KiwoomAPIService:
 
     def get_access_token(self, force_refresh: bool = False) -> str:
         token_url = f"{self.base_url}/oauth2/token"
+        logger.debug(f"토큰 요청 - force_refresh: {force_refresh}, 현재 토큰 존재: {bool(self.access_token)}, 만료시간: {self.token_expires_at}")
+        
         if force_refresh or not self.access_token or datetime.now() >= (self.token_expires_at or datetime.min):
+            logger.debug(f"새 토큰 발급 시작 - URL: {token_url}")
             headers = {"Content-Type": "application/json;charset=UTF-8"}
             body = {
                 "grant_type": "client_credentials",
                 "appkey":    self.app_key,
-                "secretkey": self.app_secret
+                "secretkey": "***"  # 보안상 마스킹
             }
+            logger.debug(f"토큰 요청 헤더: {headers}")
+            logger.debug(f"토큰 요청 본문: {body}")
+            
             try:
-                resp = requests.post(token_url, headers=headers, json=body, timeout=30)
+                resp = requests.post(token_url, headers=headers, json={
+                    "grant_type": "client_credentials",
+                    "appkey":    self.app_key,
+                    "secretkey": self.app_secret
+                }, timeout=30)
+                logger.debug(f"토큰 응답 상태코드: {resp.status_code}")
                 resp.raise_for_status()
                 data = resp.json()
+                logger.debug(f"토큰 응답 데이터 키: {list(data.keys())}")
+                
                 self.access_token   = data.get("token", "")
                 self.token_expires_at = datetime.now() + timedelta(hours=23)
-            except Exception as e:
-                logger.error(f"토큰 발급 실패: {e}")
+                logger.info(f"새 토큰 발급 성공 - 만료시간: {self.token_expires_at}")
+                
+            except requests.exceptions.RequestException as e:
+                logger.error(f"토큰 발급 네트워크 오류: {e}", exc_info=True)
                 self.access_token = ""
                 self.token_expires_at = None
+            except Exception as e:
+                logger.error(f"토큰 발급 실패: {e}", exc_info=True)
+                self.access_token = ""
+                self.token_expires_at = None
+        else:
+            logger.debug("기존 토큰 재사용")
+            
         return self.access_token
 
     def get_ws_headers(self) -> Dict[str, str]:
@@ -58,7 +84,15 @@ class KiwoomAPIService:
             "secretkey": self.app_secret
         }
         if token:
+            headers["Authorization"] = f"Bearer {token[:20]}..."  # 토큰 일부만 로깅
+            logger.debug(f"WebSocket 헤더 생성 완료 - 토큰 길이: {len(token)}")
+        else:
+            logger.warning("WebSocket 헤더에 토큰이 없음")
+            
+        # 실제 헤더에는 전체 토큰 포함
+        if token:
             headers["Authorization"] = f"Bearer {token}"
+            
         return headers
 
     async def get_condition_list(self) -> List[Dict[str, str]]:
@@ -75,20 +109,22 @@ class KiwoomAPIService:
                         raw = await asyncio.wait_for(ws.recv(), timeout=10.0)
                         msg = json.loads(raw)
                     except asyncio.TimeoutError:
-                        logger.error("로그인 응답 타임아웃")
+                        logger.error("로그인 응답 타임아웃 (10초)")
                         return []
-                    except json.JSONDecodeError:
-                        logger.warning(f"JSON 파싱 실패: {raw}")
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"JSON 파싱 실패: {e}, 원본 데이터: {raw[:200]}...")
                         continue
                         
                     if msg.get("trnm") == "PING":
+                        logger.debug("PING 메시지 수신 및 응답")
                         await ws.send(raw)
                         continue
                     if msg.get("trnm") == "LOGIN":
                         if msg.get("return_code") != 0:
-                            logger.error(f"로그인 실패: {msg.get('return_msg')}")
+                            logger.error(f"로그인 실패 - 코드: {msg.get('return_code')}, 메시지: {msg.get('return_msg')}")
+                            logger.debug(f"전체 로그인 응답: {msg}")
                             return []
-                        logger.info("로그인 성공")
+                        logger.info("WebSocket 로그인 성공")
                         break
 
                 # 조건검색식 목록 요청
@@ -101,22 +137,26 @@ class KiwoomAPIService:
                         raw = await asyncio.wait_for(ws.recv(), timeout=5.0)
                         msg = json.loads(raw)
                     except asyncio.TimeoutError:
-                        logger.warning("조건검색 목록 응답 대기 중...")
+                        logger.debug("조건검색 목록 응답 대기 중... (5초 타임아웃)")
                         continue
-                    except json.JSONDecodeError:
-                        logger.warning(f"JSON 파싱 실패: {raw}")
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"JSON 파싱 실패: {e}, 데이터: {raw[:200]}...")
                         continue
                         
                     if msg.get("trnm") == "PING":
+                        logger.debug("PING 메시지 수신 및 응답")
                         await ws.send(raw)
                         continue
                     if msg.get("trnm") == "CNSRLST":
                         if msg.get("return_code") != 0:
-                            logger.error(f"조건식 목록 조회 실패: {msg.get('return_msg')}")
+                            logger.error(f"조건식 목록 조회 실패 - 코드: {msg.get('return_code')}, 메시지: {msg.get('return_msg')}")
+                            logger.debug(f"전체 CNSRLST 응답: {msg}")
                             return []
                         data_list = msg.get("data", [])
+                        logger.debug(f"원본 조건식 데이터: {data_list[:3]}...")  # 처음 3개만 로깅
                         results = [{"seq": int(item[0]), "name": item[1]} for item in data_list]
                         logger.info(f"조건검색 목록 조회 성공: {len(results)}개")
+                        logger.debug(f"조건식 목록: {[r['name'] for r in results[:5]]}...")  # 처음 5개 이름만
                         return results
 
                 logger.error("조건식 목록 조회 타임아웃")
@@ -127,6 +167,29 @@ class KiwoomAPIService:
             return []
 
     async def request_condition(self, seq: str) -> List[Dict[str, str]]:
+        """조건검색 요청 (재연결 로직 포함)"""
+        max_retries = 3
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"조건검색 seq={seq} 시도 {attempt + 1}/{max_retries}")
+                result = await self._request_condition_single(seq)
+                if result:  # 성공시 즉시 반환
+                    logger.info(f"조건검색 seq={seq} 성공: {len(result)}개")
+                    return result
+                logger.warning(f"조건검색 seq={seq} 시도 {attempt + 1} 실패, 재시도...")
+                await asyncio.sleep(2)  # 2초 대기 후 재시도
+            except Exception as e:
+                logger.error(f"조건검색 seq={seq} 시도 {attempt + 1} 오류: {e}")
+                if attempt == max_retries - 1:  # 마지막 시도
+                    logger.error(f"조건검색 seq={seq} 최종 실패")
+                    return []
+                await asyncio.sleep(2)
+        
+        return []
+    
+    async def _request_condition_single(self, seq: str) -> List[Dict[str, str]]:
+        """단일 조건검색 요청 (내부 함수)"""
         url        = self.wss_url
         login_msg  = {"trnm": "LOGIN", "token": self.get_access_token()}
         list_req   = {"trnm": "CNSRLST"}
@@ -135,97 +198,122 @@ class KiwoomAPIService:
         next_key   = ""
         page_num   = 1
 
-        async with websockets.connect(url, extra_headers=self.get_ws_headers()) as ws:
-            # 1) 로그인
-            await ws.send(json.dumps(login_msg))
-            # → LOGIN 응답 대기 (기존 코드와 동일)
+        # WebSocket 연결 설정 강화
+        try:
+            async with websockets.connect(
+                url, 
+                extra_headers=self.get_ws_headers(),
+                ping_interval=20,    # 20초마다 ping
+                ping_timeout=10,     # ping 응답 10초 대기
+                close_timeout=5,     # 연결 종료 5초 대기
+                max_size=10**7       # 10MB 최대 메시지 크기
+            ) as ws:
+                # 1) 로그인
+                await ws.send(json.dumps(login_msg))
+                # → LOGIN 응답 대기 (기존 코드와 동일)
 
-            # 2) 목록 조회 요청
-            await ws.send(json.dumps(list_req))
+                # 2) 목록 조회 요청
+                await ws.send(json.dumps(list_req))
 
-            # → CNSRLST 응답 대기
-            while True:
-                raw = await ws.recv()
-                msg = json.loads(raw)
-                if msg.get("trnm") == "CNSRLST" and msg.get("return_code") == 0:
-                    break
-                elif msg.get("trnm") == "PING":
-                    await ws.send(raw)
-
-            # 3) 본격 조건검색 요청 (페이징)
-            while True:
-                req = {
-                    "trnm":        "CNSRREQ",
-                    "seq":         seq,
-                    "search_type": "0",
-                    "stex_tp":     "K",
-                    "cont_yn":     cont_yn,
-                    "next_key":    next_key
-                }
-                logger.info(f"페이지 {page_num} 요청 (cont_yn={cont_yn})")
-                await ws.send(json.dumps(req))
-
-                page_start = time.time()
-                page_received = False
-                
-                while time.time() - page_start < 30:
-                    try:
-                        raw = await asyncio.wait_for(ws.recv(), timeout=5.0)
-                        msg = json.loads(raw)
-                    except asyncio.TimeoutError:
-                        logger.warning(f"페이지 {page_num} 응답 대기 중...")
-                        continue
-                    except json.JSONDecodeError:
-                        logger.warning(f"JSON 파싱 실패: {raw}")
-                        continue
-
-                    trnm = msg.get("trnm")
-                    if trnm == "PING":
+                # → CNSRLST 응답 대기
+                while True:
+                    raw = await ws.recv()
+                    msg = json.loads(raw)
+                    if msg.get("trnm") == "CNSRLST" and msg.get("return_code") == 0:
+                        break
+                    elif msg.get("trnm") == "PING":
                         await ws.send(raw)
-                        continue
-                    elif trnm == "CNSRREQ":
-                        if msg.get("return_code") != 0:
-                            logger.error(f"조건검색 실패: {msg.get('return_msg')}")
-                            return all_results
 
-                        data_list = msg.get("data", [])
-                        page = [
-                            {
-                                "code":    d.get("9001"),
-                                "name":    d.get("302"),
-                                "current": d.get("10"),
-                                "sign":    d.get("25"),
-                                "change":  d.get("11"),
-                                "rate":    d.get("12"),
-                                "volume":  d.get("13"),
-                                "open":    d.get("16"),
-                                "high":    d.get("17"),
-                                "low":     d.get("18")
-                            }
-                            for d in data_list
-                        ]
-                        all_results.extend(page)
-                        logger.info(f"페이지 {page_num}: {len(page)}개 (총 {len(all_results)}개)")
+                # 3) 본격 조건검색 요청 (페이징)
+                while True:
+                    req = {
+                        "trnm":        "CNSRREQ",
+                        "seq":         seq,
+                        "search_type": "0",
+                        "stex_tp":     "K",
+                        "cont_yn":     cont_yn,
+                        "next_key":    next_key
+                    }
+                    logger.info(f"페이지 {page_num} 요청 (cont_yn={cont_yn})")
+                    await ws.send(json.dumps(req))
 
-                        # 다음 페이지 여부
-                        if msg.get("cont_yn") == "Y" and msg.get("next_key"):
-                            cont_yn  = "Y"
-                            next_key = msg.get("next_key")
-                            page_num += 1
-                            page_received = True
-                            break
+                    page_start = time.time()
+                    page_received = False
+                    
+                    while time.time() - page_start < 30:
+                        try:
+                            raw = await asyncio.wait_for(ws.recv(), timeout=5.0)
+                            msg = json.loads(raw)
+                        except asyncio.TimeoutError:
+                            logger.warning(f"페이지 {page_num} 응답 대기 중...")
+                            continue
+                        except json.JSONDecodeError:
+                            logger.warning(f"JSON 파싱 실패: {raw}")
+                            continue
+
+                        trnm = msg.get("trnm")
+                        if trnm == "PING":
+                            await ws.send(raw)
+                            continue
+                        elif trnm == "CNSRREQ":
+                            if msg.get("return_code") != 0:
+                                logger.error(f"조건검색 실패: {msg.get('return_msg')}")
+                                return all_results
+
+                            data_list = msg.get("data", [])
+                            page = [
+                                {
+                                    "code":    d.get("9001"),
+                                    "name":    d.get("302"),
+                                    "current": d.get("10"),
+                                    "sign":    d.get("25"),
+                                    "change":  d.get("11"),
+                                    "rate":    d.get("12"),
+                                    "volume":  d.get("13"),
+                                    "open":    d.get("16"),
+                                    "high":    d.get("17"),
+                                    "low":     d.get("18")
+                                }
+                                for d in data_list
+                            ]
+                            all_results.extend(page)
+                            logger.info(f"페이지 {page_num}: {len(page)}개 (총 {len(all_results)}개)")
+
+                            # 다음 페이지 여부 확인
+                            next_cont_yn = msg.get("cont_yn")
+                            next_next_key = msg.get("next_key")
+                            logger.debug(f"페이지 {page_num} 완료 - cont_yn: {next_cont_yn}, next_key: {next_next_key}")
+                            
+                            if next_cont_yn == "Y" and next_next_key:
+                                cont_yn  = "Y"
+                                next_key = next_next_key
+                                page_num += 1
+                                page_received = True
+                                logger.debug(f"다음 페이지 {page_num} 준비")
+                                break
+                            else:
+                                logger.info(f"모든 페이지 완료 - 총 {len(all_results)}개")
+                                return all_results
                         else:
-                            logger.info(f"모든 페이지 완료 - 총 {len(all_results)}개")
-                            return all_results
-                    else:
-                        logger.info(f"다른 메시지 수신: {trnm}")
+                            logger.debug(f"다른 메시지 수신: {trnm}, 데이터: {str(msg)[:100]}...")
 
-                # 페이지 타임아웃 체크
-                if not page_received:
-                    logger.error(f"페이지 {page_num} 타임아웃 (30초)")
-                    return all_results
-            # 4) 모든 페이지 조회 완료 후 결과 반환
-            return all_results      
+                    # 페이지 타임아웃 체크
+                    if not page_received:
+                        logger.error(f"페이지 {page_num} 타임아웃 (30초)")
+                        return all_results
+                
+                # 4) 모든 페이지 조회 완료 후 결과 반환
+                return all_results
+                
+        except websockets.exceptions.ConnectionClosed as e:
+            logger.error(f"_request_condition_single WebSocket 연결 종료: {e}", exc_info=True)
+            raise
+        except websockets.exceptions.WebSocketException as e:
+            logger.error(f"_request_condition_single WebSocket 오류: {e}", exc_info=True)
+            raise
+        except Exception as e:
+            logger.error(f"_request_condition_single 예상치 못한 오류: {e}", exc_info=True)
+            raise
 
     def get_daily_candles(self,
                         stk_cd: str,
@@ -323,6 +411,7 @@ class KiwoomAPIService:
             
             # DataFrame 생성
             df = pd.DataFrame(sliced_data)
+            logger.debug(f"원본 DataFrame 생성 완료 - 모양: {df.shape}, 컬럼: {list(df.columns)}")
             
             # 키움 API 응답 필드명에 맞게 컬럼 매핑
             column_mapping = {
@@ -373,9 +462,15 @@ class KiwoomAPIService:
             
             return df
             
+        except requests.exceptions.Timeout as e:
+            logger.error(f"요청 타임아웃 (30초): {e}", exc_info=True)
+            return pd.DataFrame()
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"연결 오류: {e}", exc_info=True)
+            return pd.DataFrame()
         except requests.exceptions.RequestException as e:
-            logger.error(f"네트워크 오류: {e}")
+            logger.error(f"네트워크 오류: {e}", exc_info=True)
             return pd.DataFrame()
         except Exception as e:
-            logger.error(f"일별 캔들 조회 오류: {e}")
+            logger.error(f"일별 캔들 조회 예상치 못한 오류: {e}", exc_info=True)
             return pd.DataFrame()
